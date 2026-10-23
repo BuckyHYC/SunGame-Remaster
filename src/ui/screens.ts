@@ -293,7 +293,7 @@ export class UI {
 
     let obj: string;
     if (hud.mode === 'endless') {
-      obj = '活得越久越好';
+      obj = `归位 ${hud.seatedTotal} 人 · ${hud.score} 分`;
     } else if (hud.mode === 'duel') {
       obj = '撑满 60 秒';
     } else if (hud.exitOpen) {
@@ -505,7 +505,7 @@ export class UI {
       result.mode === 'campaign'
         ? `归位 ${result.seated}/${result.required} · 彩蛋 ${result.collected} · 被命中 ${result.hits} 次`
         : result.mode === 'endless'
-          ? `生存 ${result.endlessSeconds?.toFixed(1) ?? '0'} 秒 · 被命中 ${result.hits} 次`
+          ? `归位 ${result.seatedTotal} 人 · 生存 ${result.endlessSeconds?.toFixed(1) ?? '0'} 秒 · 被命中 ${result.hits} 次`
           : result.duelWinner === 'runner'
             ? '孙巨赢了'
             : '舞剑同学赢了';

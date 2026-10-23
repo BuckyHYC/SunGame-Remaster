@@ -72,6 +72,7 @@ export function updatePlayer(rt: Runtime, dt: number, cmd: PlayerCommand): void 
   const dashing = p.dashLeft > 0;
   const dur = dashing ? BALANCE.player.dashStepMs : BALANCE.player.stepMs;
   p.move = startMove(p.cell, target, dur);
+  p.steps += 1;
   p.pos = { x: p.cell.x, y: p.cell.y };
   if (dashing) {
     p.dashLeft -= 1;

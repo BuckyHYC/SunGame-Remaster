@@ -49,6 +49,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       idleTime: 0,
       noise: 0,
       bumpCd: 0,
+      steps: 0,
     },
     chaser: {
       cell: { x: meta.chaser.x, y: meta.chaser.y },
@@ -67,6 +68,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       breath: 0,
       lostTimer: 0,
       warned: false,
+      steps: 0,
     },
     mates: [],
     pickups: [],
@@ -75,6 +77,9 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     timeLeft: endless ? Number.POSITIVE_INFINITY : def.timeLimit,
     warmth: endless ? BALANCE.skill.maxWarmth : BALANCE.skill.startWarmth,
     seated: 0,
+    seatedTotal: 0,
+    spawnTimer: BALANCE.endless.refillSeconds,
+    mateSeq: meta.seats.length,
     requireSeated,
     exitOpen: false,
     hits: 0,
@@ -99,6 +104,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     spawn: { x: meta.spawn.x, y: meta.spawn.y },
     exit: { x: meta.exit.x, y: meta.exit.y },
     chaserHome: { x: meta.chaser.x, y: meta.chaser.y },
+    seats: meta.seats.map((s) => ({ x: s.x, y: s.y })),
   };
 
   meta.seats.forEach((seat, index) => {
@@ -116,6 +122,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       wanderTimer: rng.range(0.4, 1.4),
       stepPhase: 0,
       scareCooldown: 0,
+      seatedAt: 0,
     });
   });
 
@@ -226,16 +233,73 @@ function checkOutcome(rt: Runtime): void {
 
 function updateEndless(rt: Runtime, dt: number): void {
   if (rt.mode !== 'endless' || rt.status !== 'playing') return;
+
   rt.waveTimer += dt;
-  if (rt.waveTimer < BALANCE.endless.waveSeconds) return;
-  rt.waveTimer -= BALANCE.endless.waveSeconds;
-  rt.wave += 1;
-  rt.chaser.speedMul = Math.min(
-    BALANCE.endless.maxSpeedMultiplier,
-    1 + rt.wave * BALANCE.chaser.speedRampPerWave,
-  );
-  rt.pendingSfx.push('bell');
-  say(rt, `第 ${rt.wave} 波：他更快了。`, 2);
+  if (rt.waveTimer >= BALANCE.endless.waveSeconds) {
+    rt.waveTimer -= BALANCE.endless.waveSeconds;
+    rt.wave += 1;
+    rt.chaser.speedMul = Math.min(
+      BALANCE.endless.maxSpeedMultiplier,
+      1 + rt.wave * BALANCE.chaser.speedRampPerWave,
+    );
+    rt.pendingSfx.push('bell');
+    say(rt, `第 ${rt.wave} 波：他更快了。`, 2);
+  }
+
+  // 场里快没人可救了就补一位新同学，避免"全员归位后只能逃跑"
+  rt.spawnTimer -= dt;
+  if (rt.spawnTimer > 0) return;
+  const active = rt.mates.filter((m) => m.state !== 'seated').length;
+  if (active > BALANCE.endless.refillThreshold) {
+    rt.spawnTimer = 0.5;
+    return;
+  }
+  if (spawnEndlessMate(rt)) {
+    rt.spawnTimer = Math.max(
+      BALANCE.endless.refillMinSeconds,
+      BALANCE.endless.refillSeconds - rt.seatedTotal * 0.25,
+    );
+    rt.pendingSfx.push('door');
+    say(rt, '又进来一位同学，还没找到座位。', 1);
+  } else {
+    // 座位都被回座路上的同学占着，等一等再补
+    rt.spawnTimer = 1;
+  }
+}
+
+/** 无尽模式补人：回收最久之前坐下的那位，给新同学腾出座位 */
+function spawnEndlessMate(rt: Runtime): boolean {
+  const claimed = new Set(rt.mates.map((m) => `${m.seat.x},${m.seat.y}`));
+  let seat = rt.seats.find((s) => !claimed.has(`${s.x},${s.y}`)) ?? null;
+
+  if (!seat) {
+    const seated = rt.mates
+      .filter((m) => m.state === 'seated')
+      .sort((a, b) => a.seatedAt - b.seatedAt)[0];
+    if (!seated) return false;
+    seat = { x: seated.seat.x, y: seated.seat.y };
+    rt.mates = rt.mates.filter((m) => m.id !== seated.id);
+    rt.seated = rt.mates.filter((m) => m.state === 'seated').length;
+  }
+
+  const start = pickMateStart(rt, seat);
+  const lineIndex = (rt.def.pickupOffset + rt.mateSeq) % HY_LINES.length;
+  rt.mates.push({
+    id: rt.mateSeq++,
+    seat: { x: seat.x, y: seat.y },
+    cell: { x: start.x, y: start.y },
+    pos: { x: start.x, y: start.y },
+    facing: 'down',
+    state: 'scared',
+    move: null,
+    variant: rt.mateSeq % 5,
+    lineId: HY_LINES[lineIndex].id,
+    wanderTimer: rt.rng.range(0.3, 1.1),
+    stepPhase: 0,
+    scareCooldown: 0,
+    seatedAt: 0,
+  });
+  return true;
 }
 
 /** 供 UI 查询的可达性辅助（座位是否还有同学没回去） */

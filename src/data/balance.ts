@@ -47,6 +47,11 @@ export const BALANCE = {
     waveSeconds: 15,
     maxSpeedMultiplier: 1.75,
     baseSeconds: 60,
+    /** 场上没回座位的同学少于等于这个数，就补一位新同学 */
+    refillThreshold: 1,
+    /** 补人间隔（秒），随累计归位人数缩短 */
+    refillSeconds: 6,
+    refillMinSeconds: 2.4,
   },
   duel: {
     surviveSeconds: 60,

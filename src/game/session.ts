@@ -31,6 +31,8 @@ export interface ResultView {
   timeUsed: number;
   hits: number;
   seated: number;
+  /** 无尽模式累计归位人数 */
+  seatedTotal: number;
   required: number;
   collected: number;
   newBest: boolean;
@@ -190,7 +192,14 @@ export class Session {
       dash: actions.includes('dash'),
     };
 
+    const stepsBefore = this.run.player.steps;
+    const chaserStepsBefore = this.run.chaser.steps;
     stepRuntime(this.run, dt, cmd);
+
+    // 起步即消费按键缓冲：一次按键只走一格。长按由「按住状态」维持，不受影响。
+    if (this.run.player.steps !== stepsBefore) this.input.consumeDir(1);
+    if (this.run.chaser.steps !== chaserStepsBefore) this.input.consumeDir(2);
+
     this.drainEvents();
 
     if (this.run.status !== 'playing') {
@@ -245,7 +254,7 @@ export class Session {
     let breakdown: ScoreLine[];
 
     if (this.selectedMode === 'endless') {
-      const res = scoreEndless(rt.time);
+      const res = scoreEndless({ seconds: rt.time, seated: rt.seatedTotal });
       score = res.score;
       rank = res.rank;
       breakdown = res.breakdown;
@@ -291,6 +300,7 @@ export class Session {
       timeUsed,
       hits: rt.hits,
       seated: rt.seated,
+      seatedTotal: rt.seatedTotal,
       required: Number.isFinite(rt.requireSeated) ? rt.requireSeated : 0,
       collected: rt.collected,
       newBest,
@@ -345,6 +355,8 @@ export class Session {
     timeRatio: number;
     timeLow: boolean;
     seated: number;
+    seatedTotal: number;
+    score: number;
     required: number;
     exitOpen: boolean;
     mode: GameMode;
@@ -368,6 +380,8 @@ export class Session {
       timeRatio: ratio,
       timeLow: finite && rt.timeLeft <= 15,
       seated: rt.seated,
+      seatedTotal: rt.seatedTotal,
+      score: scoreEndless({ seconds: rt.time, seated: rt.seatedTotal }).score,
       required: Number.isFinite(rt.requireSeated) ? rt.requireSeated : 0,
       exitOpen: rt.exitOpen,
       mode: this.selectedMode,

@@ -24,7 +24,9 @@ export function updateMates(rt: Runtime, dt: number): void {
         mate.pos = { x: mate.cell.x, y: mate.cell.y };
         if (mate.state === 'returning' && mate.cell.x === mate.seat.x && mate.cell.y === mate.seat.y) {
           mate.state = 'seated';
+          mate.seatedAt = rt.time;
           mate.facing = 'down';
+          rt.seatedTotal += 1;
           rt.pendingSfx.push('seated');
           sayLine(rt, 'mate-seated', 1);
           unlock(rt, 'mate-seated');
@@ -58,6 +60,8 @@ export function updateMates(rt: Runtime, dt: number): void {
         mate.move = startMove(mate.cell, next, BALANCE.mate.stepMs);
       } else if (mate.cell.x === mate.seat.x && mate.cell.y === mate.seat.y) {
         mate.state = 'seated';
+        mate.seatedAt = rt.time;
+        rt.seatedTotal += 1;
       }
       continue;
     }

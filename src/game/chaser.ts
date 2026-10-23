@@ -123,6 +123,7 @@ function manualStep(rt: Runtime, dt: number, p2Dir: Dir | null): void {
     const ny = c.cell.y + DIR_VEC[p2Dir].y;
     if (rt.grid.isWalkable(nx, ny)) {
       c.move = startMove(c.cell, { x: nx, y: ny }, BALANCE.chaser.chaseStepMs);
+      c.steps += 1;
       c.stepPhase = (c.stepPhase + 1) % 4;
       stepDust(rt, c.cell);
     } else if (c.timer <= 0) {
@@ -272,6 +273,7 @@ function startHop(rt: Runtime, to: Vec2, up: boolean): void {
 function moveChaser(rt: Runtime, to: Vec2): void {
   const c = rt.chaser;
   c.move = startMove(c.cell, to, BALANCE.chaser.chaseStepMs / c.speedMul);
+  c.steps += 1;
   c.stepPhase = (c.stepPhase + 1) % 4;
   stepDust(rt, c.cell);
 }

@@ -177,8 +177,7 @@ describe('运行时：舞剑同学', () => {  it('贴脸会举剑并砍中静止
   });
 });
 
-describe('端到端：一局完整的自习课', () => {
-  it('依次把三位同学喊回座位，再从后门离开', () => {
+describe('端到端：一局完整的自习课', () => {  it('依次把三位同学喊回座位，再从后门离开', () => {
     const rt = makeRuntime('classroom-1', 4242);
     rt.timeLimit = 9999; // 主线流程测试不模拟「手速」，只验证规则链路
     const dt = 1 / 60;
@@ -222,5 +221,31 @@ describe('端到端：一局完整的自习课', () => {
     stepRuntime(rt, dt, idle);
     expect(rt.status).toBe('won');
     expect(rt.pendingUnlocks.length).toBeGreaterThan(0);
+  });
+});
+
+describe('无尽模式：补人与计分', () => {
+  it('场上没人可救时会补一位新同学，累计归位只增不减', () => {
+    const rt = makeRuntime('classroom-1', 99, 'endless');
+    const seatCount = rt.mates.length;
+    expect(seatCount).toBeGreaterThan(0);
+
+    // 手动让所有人归位，模拟"已经没同学可救了"
+    for (const mate of rt.mates) {
+      mate.state = 'seated';
+      mate.seatedAt = rt.time;
+      rt.seatedTotal += 1;
+    }
+    const seatedBefore = rt.seatedTotal;
+    expect(seatedBefore).toBe(seatCount);
+
+    run(rt, 12, {}, pinChaser);
+
+    expect(rt.seatedTotal).toBe(seatedBefore);
+    expect(rt.mates.length).toBeGreaterThanOrEqual(seatCount);
+    // 至少来了一位还没坐下的人
+    expect(rt.mates.some((m) => m.state !== 'seated')).toBe(true);
+    // 座位数不变：多出来的同学顶替的是最早坐下的那位
+    expect(new Set(rt.mates.map((m) => `${m.seat.x},${m.seat.y}`)).size).toBeLessThanOrEqual(seatCount);
   });
 });

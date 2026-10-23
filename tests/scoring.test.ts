@@ -70,15 +70,24 @@ describe('战役评分', () => {
 });
 
 describe('无尽与双人评分', () => {
-  it('无尽按秒数给分与评级', () => {
-    expect(scoreEndless(160).rank).toBe('S');
-    expect(scoreEndless(110).rank).toBe('A');
-    expect(scoreEndless(80).rank).toBe('B');
-    expect(scoreEndless(50).rank).toBe('C');
-    expect(scoreEndless(10).rank).toBe('D');
-    expect(scoreEndless(100).score).toBe(1000);
+  it('无尽按存活时长 + 归位人数综合计分', () => {
+    // 只活不救人
+    const idle = scoreEndless({ seconds: 120, seated: 0 });
+    // 活得短但救得多
+    const helper = scoreEndless({ seconds: 60, seated: 12 });
+    expect(idle.score).toBe(960);
+    expect(helper.score).toBe(480 + 840);
+    expect(helper.score).toBeGreaterThan(idle.score);
+    expect(helper.breakdown).toHaveLength(2);
   });
 
+  it('无尽评级随综合分升高', () => {
+    expect(scoreEndless({ seconds: 120, seated: 10 }).rank).toBe('S');
+    expect(scoreEndless({ seconds: 90, seated: 6 }).rank).toBe('A');
+    expect(scoreEndless({ seconds: 60, seated: 3 }).rank).toBe('B');
+    expect(scoreEndless({ seconds: 40, seated: 1 }).rank).toBe('C');
+    expect(scoreEndless({ seconds: 10, seated: 0 }).rank).toBe('D');
+  });
   it('双人：跑掉的一方分更高，越快越高', () => {
     const fast = scoreDuel({ winner: 'runner', time: 40, hpLeft: 3 });
     const slow = scoreDuel({ winner: 'runner', time: 59, hpLeft: 1 });

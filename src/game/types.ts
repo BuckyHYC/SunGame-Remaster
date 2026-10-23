@@ -43,6 +43,8 @@ export interface PlayerState {
   /** 冲刺制造的噪音，追击者靠它定位 */
   noise: number;
   bumpCd: number;
+  /** 起步次数：输入层据此消费"按键缓冲"，保证一次按键只走一格 */
+  steps: number;
 }
 
 export type ChaserStateName =
@@ -72,6 +74,8 @@ export interface ChaserState {
   breath: number;
   lostTimer: number;
   warned: boolean;
+  /** 起步次数：双人模式下 P2 的按键缓冲据此消费 */
+  steps: number;
 }
 
 export type MateStateName = 'scared' | 'returning' | 'seated';
@@ -89,6 +93,8 @@ export interface MateState {
   wanderTimer: number;
   stepPhase: number;
   scareCooldown: number;
+  /** 归位的时刻（rt.time），无尽模式用来淘汰最早坐下的同学 */
+  seatedAt: number;
 }
 
 export interface PickupState {
@@ -124,6 +130,8 @@ export interface Runtime {
   spawn: Vec2;
   exit: Vec2;
   chaserHome: Vec2;
+  /** 本关全部座位（无尽模式补人时用来分配空位） */
+  seats: Vec2[];
 
   player: PlayerState;
   chaser: ChaserState;
@@ -136,6 +144,12 @@ export interface Runtime {
 
   warmth: number;
   seated: number;
+  /** 累计归位人数（无尽模式跨波计分用） */
+  seatedTotal: number;
+  /** 无尽模式补人倒计时 */
+  spawnTimer: number;
+  /** 同学 id 递增序号 */
+  mateSeq: number;
   requireSeated: number;
   exitOpen: boolean;
 

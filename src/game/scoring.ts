@@ -74,15 +74,21 @@ export function scoreCampaign(input: CampaignScoreInput): ScoreResult {
   return { score, rank: rankForScore(score), breakdown };
 }
 
-/** 无尽模式：按生存秒数评分 */
-export function scoreEndless(seconds: number): ScoreResult {
-  const score = Math.round(seconds * 10);
+/** 无尽模式：存活时长与累计归位人数共同计分 */
+export function scoreEndless(input: { seconds: number; seated: number }): ScoreResult {
+  const seconds = Math.round(input.seconds);
+  const timeScore = seconds * 8;
+  const seatScore = input.seated * 70;
+  const score = timeScore + seatScore;
   const rank: Rank =
-    seconds >= 150 ? 'S' : seconds >= 105 ? 'A' : seconds >= 70 ? 'B' : seconds >= 40 ? 'C' : 'D';
+    score >= 1400 ? 'S' : score >= 950 ? 'A' : score >= 650 ? 'B' : score >= 350 ? 'C' : 'D';
   return {
     score,
     rank,
-    breakdown: [{ label: `生存 ${Math.floor(seconds)}s ×10`, value: score }],
+    breakdown: [
+      { label: `生存 ${seconds}s ×8`, value: timeScore },
+      { label: `归位 ${input.seated} 位 ×70`, value: seatScore },
+    ],
   };
 }
 

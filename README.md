@@ -2,6 +2,8 @@
 
 2025 年那个 861 行的课堂小游戏，用第一性原理拆开重新做了一遍：**保留全部班级梗，把四根玩法支柱各自加固**。
 
+**在线玩：<https://buckyhyc.github.io/SunGame-Remaster/>** · 原版存档：<https://github.com/BuckyHYC/SunGame>
+
 ![标题](docs/screenshots/01-title.png)
 
 ![游玩](docs/screenshots/02-play.png)

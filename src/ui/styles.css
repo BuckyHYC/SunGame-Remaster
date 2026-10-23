@@ -73,8 +73,10 @@ body::before {
   flex-direction: column;
   gap: 10px;
   align-items: stretch;
-  width: max-content;
+  /* 宽度跟着画布走：窄屏时 HUD/字幕换行，而不是把整页撑宽 */
+  width: calc(504px * var(--scale) + 4px);
   max-width: 100%;
+  min-width: 0;
 }
 
 /* ---------- HUD ---------- */
@@ -867,6 +869,47 @@ body.is-touch .touch {
     font-size: 11px;
     gap: 8px;
     padding: 6px 8px;
+  }
+
+  .hud__spacer {
+    display: none;
+  }
+
+  .dialog__text {
+    font-size: 12px;
+  }
+
+  /* 小屏画布只有 ~240px 高：让覆盖层脱离画布、铺满视口，避免菜单被裁掉 */
+  .overlay.is-open {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(10, 12, 16, 0.94);
+    padding: 16px 12px;
+    align-items: safe center;
+  }
+
+  .overlay__inner {
+    gap: 8px;
+    max-width: 420px;
+  }
+
+  .logo__main {
+    font-size: 24px;
+  }
+
+  .btn--big {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .menu {
+    gap: 8px;
   }
 
   .logo__main {

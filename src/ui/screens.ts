@@ -215,7 +215,13 @@ export class UI {
     if (!this.touch) return;
     const touchDevice =
       window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-    this.touch.style.display = visible && touchDevice ? 'flex' : 'none';
+    if (!touchDevice) {
+      this.touch.style.display = 'none';
+      return;
+    }
+    // 用 visibility 而不是 display：按键在文档流里占位，菜单开关时画面不跳动
+    this.touch.style.display = 'flex';
+    this.touch.style.visibility = visible ? 'visible' : 'hidden';
   }
 
   /** 设置类操作后强制重画覆盖层 */
@@ -229,6 +235,8 @@ export class UI {
     const active = session.phase === 'playing' || session.phase === 'paused' || session.phase === 'result';
     if (this.hud.style.display !== (active ? 'flex' : 'none')) {
       this.hud.style.display = active ? 'flex' : 'none';
+      // 状态栏显隐会改变可用高度，通知一次重新适配缩放
+      window.dispatchEvent(new Event('resize'));
     }
     this.syncHud(session);
     this.syncDialog(session);

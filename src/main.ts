@@ -103,17 +103,47 @@ const ui = new UI(handlers, save);
 
 input.attach();
 
-// 缩放：像素画只做整数倍放大；屏幕太小时按比例缩小以免溢出
+// 缩放：像素画只做整数倍放大；屏幕太小时按比例缩小以免溢出，
+// 并且会把下方 HUD/字幕/虚拟按键的实际高度算进去，保证整页不出现竖向滚动。
 function resize(): void {
-  const availW = Math.min(window.innerWidth - 32, 1100);
-  const availH = window.innerHeight - 210;
-  const raw = Math.min(availW / 504, availH / 336);
-  const scale = raw >= 1.5 ? Math.max(1, Math.min(4, Math.floor(raw))) : Math.max(0.45, Math.round(raw * 50) / 50);
-  document.documentElement.style.setProperty('--scale', String(scale));
+  if (resizeTick) {
+    window.clearTimeout(resizeTick);
+    resizeTick = 0;
+  }
+  const touch = document.getElementById('touch');
+  const sideBySide = window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+  const touchWidth =
+    sideBySide && touch && touch.style.display !== 'none' ? touch.getBoundingClientRect().width + 12 : 0;
+  const availW = Math.min(window.innerWidth - 32 - touchWidth, 1100);
+  const raw = availW / 504;
+  let scale = raw >= 1.5 ? Math.max(1, Math.min(4, Math.floor(raw))) : Math.max(0.45, Math.round(raw * 50) / 50);
+
+  // 按真实文档尺寸收敛：只要整页塞不进视口就继续缩，不靠估算留白
+  const root = document.documentElement;
+  for (let i = 0; i < 40; i++) {
+    root.style.setProperty('--scale', String(scale));
+    const docH = Math.max(document.body.scrollHeight, root.scrollHeight);
+    const docW = Math.max(document.body.scrollWidth, root.scrollWidth);
+    const fits = docH <= window.innerHeight + 1 && docW <= window.innerWidth + 1;
+    if (fits || scale <= 0.45) break;
+    scale = Math.max(0.45, Math.round((scale - 0.04) * 100) / 100);
+  }
+  root.style.setProperty('--scale', String(scale));
 }
 
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', resize);
+// 触屏按键高度变化会改变可用高度，首帧后再校正一次
+let resizeTick = 0;
+function scheduleResize(): void {
+  if (resizeTick) window.clearTimeout(resizeTick);
+  resizeTick = window.setTimeout(() => {
+    resizeTick = 0;
+    resize();
+  }, 80);
+}
+
+window.addEventListener('resize', scheduleResize);
+window.addEventListener('orientationchange', scheduleResize);
+window.addEventListener('load', scheduleResize);
 resize();
 
 // 触屏设备才显示虚拟按键

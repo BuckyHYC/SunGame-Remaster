@@ -47,6 +47,7 @@ const wait = Number(args.wait ?? 2000);
 const width = Number(args.width ?? 1440);
 const height = Number(args.height ?? 900);
 const evalScript = args.eval ?? null;
+const touch = args.touch === 'true';
 const chrome = args.chrome ?? findChrome();
 if (!chrome) {
   console.error('找不到 chrome.exe');
@@ -135,6 +136,9 @@ async function main() {
     deviceScaleFactor: 1,
     mobile: false,
   });
+  if (touch) {
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  }
   await send('Page.navigate', { url });
   await sleep(wait);
 

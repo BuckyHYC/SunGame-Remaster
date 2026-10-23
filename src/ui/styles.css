@@ -22,6 +22,18 @@
   box-sizing: border-box;
 }
 
+/* 所有按钮/虚拟按键的文字都不允许被选中（手机上双击/长按会误选） */
+button,
+.touch {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body {
   margin: 0;
@@ -804,58 +816,106 @@ canvas#game {
 
 /* ---------- 触屏 ---------- */
 
+/* 虚拟按键排在画面下方（不进画面区域），尺寸随屏宽缩放 */
 .touch {
+  --pad-btn: clamp(52px, 14vw, 68px);
+  --act-btn: clamp(64px, 18vw, 86px);
   display: none;
-  position: absolute;
-  inset: auto 0 0 0;
-  padding: 10px;
+  gap: 10px;
   justify-content: space-between;
   align-items: flex-end;
-  pointer-events: none;
-  z-index: 15;
-}
-
-.touch__pad {
-  display: grid;
-  grid-template-columns: repeat(3, 42px);
-  grid-template-rows: repeat(3, 42px);
-  gap: 4px;
-  pointer-events: auto;
-}
-
-.touch__btn {
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  background: rgba(16, 20, 26, 0.62);
-  color: rgba(255, 255, 255, 0.8);
-  font: inherit;
-  font-size: 12px;
-  border-radius: 4px;
-  display: grid;
-  place-items: center;
-  user-select: none;
-  -webkit-user-select: none;
+  margin-top: 8px;
   touch-action: none;
-}
-
-.touch__btn:active {
-  background: rgba(255, 209, 102, 0.28);
-}
-
-.touch__actions {
-  display: flex;
-  gap: 8px;
-  pointer-events: auto;
-}
-
-.touch__actions .touch__btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  font-size: 11px;
 }
 
 body.is-touch .touch {
   display: flex;
+}
+
+.touch__pad {
+  display: grid;
+  grid-template-columns: repeat(3, var(--pad-btn));
+  grid-template-rows: repeat(3, var(--pad-btn));
+  gap: 6px;
+}
+
+.touch__btn {
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(16, 20, 26, 0.72);
+  color: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  font-size: calc(var(--pad-btn) * 0.36);
+  line-height: 1;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.touch__btn:active {
+  background: rgba(255, 209, 102, 0.32);
+}
+
+.touch__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.touch__actions .touch__btn {
+  width: var(--act-btn);
+  height: var(--act-btn);
+  border-radius: 50%;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+/* 横屏手机：画面与虚拟按键并排，避免按键把画面挤扁 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .stage {
+    display: grid;
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'hud hud'
+      'screen touch'
+      'dialog dialog'
+      'footer footer';
+    gap: 8px 12px;
+    align-items: start;
+  }
+
+  .hud {
+    grid-area: hud;
+  }
+
+  .screen-wrap {
+    grid-area: screen;
+  }
+
+  .dialog {
+    grid-area: dialog;
+  }
+
+  .footer {
+    grid-area: footer;
+  }
+
+  .touch {
+    --pad-btn: 44px;
+    --act-btn: 58px;
+    grid-area: touch;
+    margin-top: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    align-self: center;
+  }
+
+  .touch__actions {
+    flex-direction: column;
+  }
 }
 
 /* ---------- 小屏 ---------- */

@@ -17,24 +17,24 @@
         <header class="hud" id="hud" aria-label="状态栏"></header>
         <div class="screen-wrap" id="screenWrap">
           <canvas id="game" width="504" height="336" aria-label="游戏画面"></canvas>
-          <div class="touch" id="touch" aria-hidden="true">
-            <div class="touch__pad">
-              <span></span>
-              <button class="touch__btn" data-dir="up" aria-label="向上">▲</button>
-              <span></span>
-              <button class="touch__btn" data-dir="left" aria-label="向左">◀</button>
-              <span></span>
-              <button class="touch__btn" data-dir="right" aria-label="向右">▶</button>
-              <span></span>
-              <button class="touch__btn" data-dir="down" aria-label="向下">▼</button>
-              <span></span>
-            </div>
-            <div class="touch__actions">
-              <button class="touch__btn" data-touch="interact" aria-label="喊同学回座位">喊人</button>
-              <button class="touch__btn" data-touch="skill" aria-label="使用温暖了">温暖了</button>
-            </div>
-          </div>
           <div class="overlay" id="overlay" aria-live="polite"></div>
+        </div>
+        <div class="touch" id="touch" aria-hidden="true">
+          <div class="touch__pad">
+            <span></span>
+            <button class="touch__btn" data-dir="up" aria-label="向上">▲</button>
+            <span></span>
+            <button class="touch__btn" data-dir="left" aria-label="向左">◀</button>
+            <span></span>
+            <button class="touch__btn" data-dir="right" aria-label="向右">▶</button>
+            <span></span>
+            <button class="touch__btn" data-dir="down" aria-label="向下">▼</button>
+            <span></span>
+          </div>
+          <div class="touch__actions">
+            <button class="touch__btn" data-touch="interact" aria-label="喊同学回座位">喊人</button>
+            <button class="touch__btn" data-touch="skill" aria-label="使用温暖了">温暖了</button>
+          </div>
         </div>
         <div class="dialog" id="dialog" role="log" aria-live="polite"></div>
         <footer class="footer" id="footer"></footer>

@@ -40,6 +40,7 @@ export interface ResultView {
   cause: string;
   endlessSeconds: number | null;
   duelWinner: 'runner' | 'chaser' | null;
+  hpLeft: number;
   hasNext: boolean;
 }
 
@@ -260,11 +261,7 @@ export class Session {
       breakdown = res.breakdown;
       this.save.recordEndless(rt.time);
     } else if (this.selectedMode === 'duel') {
-      const res = scoreDuel({
-        winner: rt.duelWinner ?? 'chaser',
-        time: rt.time,
-        hpLeft: rt.player.hp,
-      });
+      const res = scoreDuel({ winner: rt.duelWinner ?? 'chaser', seated: rt.seatedTotal });
       score = res.score;
       rank = res.rank;
       breakdown = res.breakdown;
@@ -308,6 +305,7 @@ export class Session {
       cause: this.causeText(rt, won),
       endlessSeconds: this.selectedMode === 'endless' ? rt.time : null,
       duelWinner: rt.duelWinner,
+      hpLeft: rt.player.hp,
       hasNext: this.selectedMode === 'campaign' && won && this.nextLevelId() !== null,
     };
     this.phase = 'result';

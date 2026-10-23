@@ -303,7 +303,7 @@ export class UI {
     if (hud.mode === 'endless') {
       obj = `归位 ${hud.seatedTotal} 人 · ${hud.score} 分`;
     } else if (hud.mode === 'duel') {
-      obj = '撑满 60 秒';
+      obj = `归位 ${hud.seatedTotal} 人 · 撑满 60 秒`;
     } else if (hud.exitOpen) {
       obj = '后门已开，快跑！';
     } else {
@@ -515,8 +515,8 @@ export class UI {
         : result.mode === 'endless'
           ? `归位 ${result.seatedTotal} 人 · 生存 ${result.endlessSeconds?.toFixed(1) ?? '0'} 秒 · 被命中 ${result.hits} 次`
           : result.duelWinner === 'runner'
-            ? '孙巨赢了'
-            : '舞剑同学赢了';
+            ? `孙巨撑住了 60 秒 · 归位 ${result.seatedTotal} 人 · 剩余暖意 ${result.hpLeft}`
+            : `舞剑同学赢了 · 孙巨归位 ${result.seatedTotal} 人`;
     return `
       <div class="panel panel--wide">
         <div class="panel__eyebrow">RESULT</div>

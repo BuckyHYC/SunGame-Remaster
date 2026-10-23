@@ -109,14 +109,15 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
 
   const initialMates = endless ? Math.min(meta.seats.length, 3) : meta.seats.length;
   meta.seats.slice(0, initialMates).forEach((seat, index) => {
-    const start = duel ? seat : pickMateStart(rt, seat);
+    // 双人模式也要先散开，玩家才有"喊人回座"可做
+    const start = pickMateStart(rt, seat);
     rt.mates.push({
       id: index,
       seat: { x: seat.x, y: seat.y },
       cell: { x: start.x, y: start.y },
       pos: { x: start.x, y: start.y },
       facing: 'down',
-      state: duel ? 'seated' : 'scared',
+      state: 'scared',
       move: null,
       variant: index % 5,
       lineId: HY_LINES[(def.pickupOffset + index) % HY_LINES.length].id,
@@ -139,7 +140,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     });
   });
 
-  if (duel) rt.seated = rt.mates.length;
+  if (duel) rt.seated = 0;
 
   return rt;
 }
@@ -165,7 +166,8 @@ export function stepRuntime(rt: Runtime, dt: number, cmd: FrameCommand): void {
   const seated = rt.mates.filter((m) => m.state === 'seated').length;
   if (seated !== rt.seated) {
     rt.seated = seated;
-    if (!rt.exitOpen && rt.mode !== 'endless' && seated >= rt.requireSeated) {
+    // 双人模式后门一直锁着，只有战役关会开门
+    if (!rt.exitOpen && rt.mode === 'campaign' && seated >= rt.requireSeated) {
       rt.exitOpen = true;
       rt.pendingSfx.push('door');
       say(rt, '同学都回座位了，后门开了！', 2);
@@ -174,7 +176,7 @@ export function stepRuntime(rt: Runtime, dt: number, cmd: FrameCommand): void {
 
   checkCollision(rt);
   checkOutcome(rt);
-  updateEndless(rt, step);
+  updateModeSpawns(rt, step);
 }
 
 function checkCollision(rt: Runtime): void {
@@ -247,31 +249,49 @@ function endlessSpawnInterval(rt: Runtime): number {
   return Math.max(refillMinSeconds, refillSeconds - (refillSeconds - refillMinSeconds) * progress);
 }
 
-function updateEndless(rt: Runtime, dt: number): void {
-  if (rt.mode !== 'endless' || rt.status !== 'playing') return;
-
-  rt.waveTimer += dt;
-  if (rt.waveTimer >= BALANCE.endless.waveSeconds) {
-    rt.waveTimer -= BALANCE.endless.waveSeconds;
-    rt.wave += 1;
-    rt.chaser.speedMul = Math.min(
-      BALANCE.endless.maxSpeedMultiplier,
-      1 + rt.wave * BALANCE.chaser.speedRampPerWave,
-    );
-    rt.pendingSfx.push('bell');
-    say(rt, `第 ${rt.wave} 波：他更快了。`, 2);
+/** 当前模式允许同时在场的"没座位"同学上限与补人间隔（战役不需要补人） */
+export function spawnPolicy(rt: Runtime): { cap: number; interval: number } | null {
+  if (rt.mode === 'endless') return { cap: endlessUnseatedCap(rt), interval: endlessSpawnInterval(rt) };
+  if (rt.mode === 'duel') {
+    // 双人模式：固定节奏补人，不变快也不变多
+    return {
+      cap: Math.min(BALANCE.duel.unseatedCap, rt.seats.length),
+      interval: BALANCE.duel.spawnSeconds,
+    };
   }
+  return null;
+}
+
+function updateModeSpawns(rt: Runtime, dt: number): void {
+  if (rt.status !== 'playing') return;
+
+  if (rt.mode === 'endless') {
+    rt.waveTimer += dt;
+    if (rt.waveTimer >= BALANCE.endless.waveSeconds) {
+      rt.waveTimer -= BALANCE.endless.waveSeconds;
+      rt.wave += 1;
+      rt.chaser.speedMul = Math.min(
+        BALANCE.endless.maxSpeedMultiplier,
+        1 + rt.wave * BALANCE.chaser.speedRampPerWave,
+      );
+      rt.pendingSfx.push('bell');
+      say(rt, `第 ${rt.wave} 波：他更快了。`, 2);
+    }
+  }
+
+  const policy = spawnPolicy(rt);
+  if (!policy) return;
 
   // 场里没找到座位的同学不足上限时补人，避免"全员归位后只能逃跑"
   rt.spawnTimer -= dt;
   if (rt.spawnTimer > 0) return;
   const unseated = rt.mates.filter((m) => m.state !== 'seated' && m.state !== 'leaving').length;
-  if (unseated >= endlessUnseatedCap(rt)) {
+  if (unseated >= policy.cap) {
     rt.spawnTimer = 0.5;
     return;
   }
   if (spawnEndlessMate(rt)) {
-    rt.spawnTimer = endlessSpawnInterval(rt);
+    rt.spawnTimer = policy.interval;
     rt.pendingSfx.push('door');
     say(rt, '又进来一位同学，还没找到座位。', 1);
   } else {

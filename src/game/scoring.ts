@@ -92,19 +92,14 @@ export function scoreEndless(input: { seconds: number; seated: number }): ScoreR
   };
 }
 
-/** 双人对战：抓到 / 撑住 都算赢，评级看用时与剩余暖意 */
-export function scoreDuel(params: { winner: 'runner' | 'chaser'; time: number; hpLeft: number }): ScoreResult {
-  const base = params.winner === 'runner' ? 800 : 700;
-  const speed = Math.max(0, 60 - Math.floor(params.time)) * 4;
-  const hp = params.hpLeft * 50;
-  const score = Math.min(1000, base + speed + hp);
-  return {
-    score,
-    rank: rankForScore(score),
-    breakdown: [
-      { label: params.winner === 'runner' ? '躲过了 60 秒' : '抓到了孙巨', value: base },
-      { label: `用时 ${Math.floor(params.time)}s`, value: speed },
-      { label: '剩余暖意', value: hp },
-    ],
-  };
+/** 双人对战：按成功喊回座位的同学数计分（不看存活时长） */
+export function scoreDuel(params: { winner: 'runner' | 'chaser'; seated: number }): ScoreResult {
+  const seatScore = params.seated * 120;
+  const winBonus = params.winner === 'runner' ? 300 : 0;
+  const score = seatScore + winBonus;
+  const rank: Rank =
+    score >= 1200 ? 'S' : score >= 900 ? 'A' : score >= 600 ? 'B' : score >= 300 ? 'C' : 'D';
+  const breakdown: ScoreLine[] = [{ label: `归位 ${params.seated} 位 ×120`, value: seatScore }];
+  if (winBonus) breakdown.push({ label: '撑满 60 秒', value: winBonus });
+  return { score, rank, breakdown };
 }

@@ -57,6 +57,9 @@ export const BALANCE = {
   duel: {
     surviveSeconds: 60,
     skillUses: 2,
+    /** 双人模式固定节奏补人：不变快也不变多 */
+    spawnSeconds: 5,
+    unseatedCap: 3,
   },
   fx: {
     maxParticles: 240,

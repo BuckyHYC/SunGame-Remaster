@@ -88,10 +88,22 @@ describe('无尽与双人评分', () => {
     expect(scoreEndless({ seconds: 40, seated: 1 }).rank).toBe('C');
     expect(scoreEndless({ seconds: 10, seated: 0 }).rank).toBe('D');
   });
-  it('双人：跑掉的一方分更高，越快越高', () => {
-    const fast = scoreDuel({ winner: 'runner', time: 40, hpLeft: 3 });
-    const slow = scoreDuel({ winner: 'runner', time: 59, hpLeft: 1 });
-    expect(fast.score).toBeGreaterThan(slow.score);
-    expect(scoreDuel({ winner: 'chaser', time: 20, hpLeft: 0 }).score).toBeGreaterThan(600);
+  it('双人：按喊回座位的同学数计分，不看存活时长', () => {
+    const many = scoreDuel({ winner: 'runner', seated: 8 });
+    const few = scoreDuel({ winner: 'runner', seated: 2 });
+    expect(many.score).toBeGreaterThan(few.score);
+    expect(many.score).toBe(8 * 120 + 300);
+    expect(many.breakdown.some((b) => b.label.includes('60 秒'))).toBe(true);
+    // 没撑住就没有那 300 分，但归位分照算
+    const caught = scoreDuel({ winner: 'chaser', seated: 4 });
+    expect(caught.score).toBe(4 * 120);
+    expect(caught.breakdown).toHaveLength(1);
+  });
+
+  it('双人评级看归位人数', () => {
+    expect(scoreDuel({ winner: 'runner', seated: 8 }).rank).toBe('S');
+    expect(scoreDuel({ winner: 'runner', seated: 5 }).rank).toBe('A');
+    expect(scoreDuel({ winner: 'chaser', seated: 3 }).rank).toBe('C');
+    expect(scoreDuel({ winner: 'chaser', seated: 0 }).rank).toBe('D');
   });
 });

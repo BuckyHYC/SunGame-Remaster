@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRuntime, endlessUnseatedCap, stepRuntime } from '../src/game/runtime';
+import { createRuntime, endlessUnseatedCap, spawnPolicy, stepRuntime } from '../src/game/runtime';
 import { validateLevel } from '../src/game/validate';
 import { getLevel } from '../src/game/levels';
 import { FrameCommand, Runtime } from '../src/game/types';
@@ -281,5 +281,45 @@ describe('无尽模式：补人与计分', () => {
 
     run(rt, 12, {}, pinChaser);
     expect(rt.mates.some((m) => m.id === a.id)).toBe(false);
+  });
+});
+
+describe('双人模式：喊同学回座位', () => {
+  it('开局同学是散开的，按 E 能喊回座位并计入归位', () => {
+    const rt = makeRuntime('duel', 3, 'duel');
+    expect(rt.mates.length).toBeGreaterThan(0);
+    expect(rt.mates.every((m) => m.state === 'scared')).toBe(true);
+
+    const mate = rt.mates[0];
+    rt.player.cell = { ...mate.cell };
+    rt.player.pos = { ...mate.cell };
+    rt.player.move = null;
+    stepRuntime(rt, 1 / 60, { ...idle, interact: true });
+    expect(mate.state).toBe('returning');
+
+    for (let i = 0; i < 3000 && mate.state !== 'seated'; i++) {
+      pinChaser(rt);
+      stepRuntime(rt, 1 / 60, idle);
+    }
+    expect(mate.state).toBe('seated');
+    expect(rt.seatedTotal).toBe(1);
+  });
+
+  it('双人也会补同学，但节奏与上限都不随时间变', () => {
+    const rt = makeRuntime('duel', 9, 'duel');
+    const before = spawnPolicy(rt);
+    expect(before?.cap).toBe(3);
+
+    rt.mates.forEach((m) => {
+      m.state = 'seated';
+      m.seatedAt = rt.time;
+      rt.seatedTotal += 1;
+    });
+    run(rt, 12, {}, pinChaser);
+
+    const unseated = rt.mates.filter((m) => m.state !== 'seated' && m.state !== 'leaving').length;
+    expect(unseated).toBeGreaterThan(0);
+    expect(unseated).toBeLessThanOrEqual(3);
+    expect(spawnPolicy(rt)?.interval).toBe(before?.interval);
   });
 });

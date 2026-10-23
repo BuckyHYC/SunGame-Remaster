@@ -47,11 +47,12 @@ export const BALANCE = {
     waveSeconds: 15,
     maxSpeedMultiplier: 1.75,
     baseSeconds: 60,
-    /** 场上没回座位的同学少于等于这个数，就补一位新同学 */
-    refillThreshold: 1,
-    /** 补人间隔（秒），随累计归位人数缩短 */
+    /** 补人间隔（秒）：开局 → 越到后面越短，到 refillMinSeconds 为止 */
     refillSeconds: 6,
-    refillMinSeconds: 2.4,
+    refillMinSeconds: 1.8,
+    /** 场上"没找到座位"的同学上限：3 起步，每累计归位 4 位 +1，最多到座位数 */
+    unseatedBase: 3,
+    unseatedPerSeat: 4,
   },
   duel: {
     surviveSeconds: 60,

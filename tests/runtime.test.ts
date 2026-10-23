@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRuntime, stepRuntime } from '../src/game/runtime';
+import { createRuntime, endlessUnseatedCap, stepRuntime } from '../src/game/runtime';
 import { validateLevel } from '../src/game/validate';
 import { getLevel } from '../src/game/levels';
 import { FrameCommand, Runtime } from '../src/game/types';
@@ -245,7 +245,41 @@ describe('无尽模式：补人与计分', () => {
     expect(rt.mates.length).toBeGreaterThanOrEqual(seatCount);
     // 至少来了一位还没坐下的人
     expect(rt.mates.some((m) => m.state !== 'seated')).toBe(true);
-    // 座位数不变：多出来的同学顶替的是最早坐下的那位
-    expect(new Set(rt.mates.map((m) => `${m.seat.x},${m.seat.y}`)).size).toBeLessThanOrEqual(seatCount);
+  });
+
+  it('没找到座位的同学有上限，不会无限变多', () => {
+    const rt = makeRuntime('endless', 21, 'endless');
+    expect(rt.seats.length).toBe(5);
+    expect(rt.mates.length).toBe(3); // 开局只放 3 位
+
+    run(rt, 40, {}, pinChaser);
+
+    const unseated = rt.mates.filter((m) => m.state !== 'seated' && m.state !== 'leaving').length;
+    expect(unseated).toBeLessThanOrEqual(endlessUnseatedCap(rt));
+    expect(endlessUnseatedCap(rt)).toBeLessThanOrEqual(rt.seats.length);
+    expect(rt.mates.length).toBeLessThanOrEqual(rt.seats.length + endlessUnseatedCap(rt));
+  });
+
+  it('坐满后有人让座：最早坐下的那位起身走到后门再消失', () => {
+    const rt = makeRuntime('endless', 11, 'endless');
+    const [a, b] = rt.mates;
+    const seat = { x: 4, y: 3 };
+    a.seat = { ...seat };
+    a.cell = { ...seat };
+    a.pos = { ...seat };
+    a.state = 'seated';
+    a.seatedAt = 1;
+    b.seat = { ...seat };
+    b.cell = { ...seat };
+    b.pos = { ...seat };
+    b.state = 'returning';
+    b.move = null;
+
+    stepRuntime(rt, 1 / 60, idle);
+    expect(a.state).toBe('leaving');
+    expect(b.state).toBe('seated');
+
+    run(rt, 12, {}, pinChaser);
+    expect(rt.mates.some((m) => m.id === a.id)).toBe(false);
   });
 });

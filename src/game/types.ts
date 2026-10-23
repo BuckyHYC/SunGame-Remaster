@@ -78,7 +78,7 @@ export interface ChaserState {
   steps: number;
 }
 
-export type MateStateName = 'scared' | 'returning' | 'seated';
+export type MateStateName = 'scared' | 'returning' | 'seated' | 'leaving';
 
 export interface MateState {
   id: number;
@@ -95,6 +95,8 @@ export interface MateState {
   scareCooldown: number;
   /** 归位的时刻（rt.time），无尽模式用来淘汰最早坐下的同学 */
   seatedAt: number;
+  /** 离场淡出进度：1 完全不透明，0 视为已经走出去 */
+  fade: number;
 }
 
 export interface PickupState {

@@ -107,7 +107,8 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     seats: meta.seats.map((s) => ({ x: s.x, y: s.y })),
   };
 
-  meta.seats.forEach((seat, index) => {
+  const initialMates = endless ? Math.min(meta.seats.length, 3) : meta.seats.length;
+  meta.seats.slice(0, initialMates).forEach((seat, index) => {
     const start = duel ? seat : pickMateStart(rt, seat);
     rt.mates.push({
       id: index,
@@ -123,6 +124,7 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       stepPhase: 0,
       scareCooldown: 0,
       seatedAt: 0,
+      fade: 1,
     });
   });
 
@@ -231,6 +233,20 @@ function checkOutcome(rt: Runtime): void {
   }
 }
 
+/** 无尽模式：场上同时"没找到座位"的同学上限，随进度从 3 涨到座位数为止 */
+export function endlessUnseatedCap(rt: Runtime): number {
+  const { unseatedBase, unseatedPerSeat } = BALANCE.endless;
+  const growth = unseatedBase + Math.floor(rt.seatedTotal / unseatedPerSeat);
+  return Math.max(1, Math.min(rt.seats.length, growth));
+}
+
+/** 无尽模式补人间隔：越到后面越快，但不会低于下限 */
+function endlessSpawnInterval(rt: Runtime): number {
+  const { refillSeconds, refillMinSeconds } = BALANCE.endless;
+  const progress = Math.min(1, rt.time / 180);
+  return Math.max(refillMinSeconds, refillSeconds - (refillSeconds - refillMinSeconds) * progress);
+}
+
 function updateEndless(rt: Runtime, dt: number): void {
   if (rt.mode !== 'endless' || rt.status !== 'playing') return;
 
@@ -246,40 +262,40 @@ function updateEndless(rt: Runtime, dt: number): void {
     say(rt, `第 ${rt.wave} 波：他更快了。`, 2);
   }
 
-  // 场里快没人可救了就补一位新同学，避免"全员归位后只能逃跑"
+  // 场里没找到座位的同学不足上限时补人，避免"全员归位后只能逃跑"
   rt.spawnTimer -= dt;
   if (rt.spawnTimer > 0) return;
-  const active = rt.mates.filter((m) => m.state !== 'seated').length;
-  if (active > BALANCE.endless.refillThreshold) {
+  const unseated = rt.mates.filter((m) => m.state !== 'seated' && m.state !== 'leaving').length;
+  if (unseated >= endlessUnseatedCap(rt)) {
     rt.spawnTimer = 0.5;
     return;
   }
   if (spawnEndlessMate(rt)) {
-    rt.spawnTimer = Math.max(
-      BALANCE.endless.refillMinSeconds,
-      BALANCE.endless.refillSeconds - rt.seatedTotal * 0.25,
-    );
+    rt.spawnTimer = endlessSpawnInterval(rt);
     rt.pendingSfx.push('door');
     say(rt, '又进来一位同学，还没找到座位。', 1);
   } else {
-    // 座位都被回座路上的同学占着，等一等再补
     rt.spawnTimer = 1;
   }
 }
 
-/** 无尽模式补人：回收最久之前坐下的那位，给新同学腾出座位 */
+/** 无尽模式补人：座位可以排队，坐满后由「后来者坐下、最早那位起身离开」来腾椅子 */
 function spawnEndlessMate(rt: Runtime): boolean {
-  const claimed = new Set(rt.mates.map((m) => `${m.seat.x},${m.seat.y}`));
-  let seat = rt.seats.find((s) => !claimed.has(`${s.x},${s.y}`)) ?? null;
-
-  if (!seat) {
-    const seated = rt.mates
-      .filter((m) => m.state === 'seated')
-      .sort((a, b) => a.seatedAt - b.seatedAt)[0];
-    if (!seated) return false;
-    seat = { x: seated.seat.x, y: seated.seat.y };
-    rt.mates = rt.mates.filter((m) => m.id !== seated.id);
-    rt.seated = rt.mates.filter((m) => m.state === 'seated').length;
+  if (rt.seats.length === 0) return false;
+  const load = new Map<string, number>();
+  for (const seat of rt.seats) load.set(`${seat.x},${seat.y}`, 0);
+  for (const mate of rt.mates) {
+    const key = `${mate.seat.x},${mate.seat.y}`;
+    if (load.has(key)) load.set(key, (load.get(key) ?? 0) + 1);
+  }
+  let seat = rt.seats[0];
+  let bestLoad = Number.POSITIVE_INFINITY;
+  for (const candidate of rt.seats) {
+    const count = load.get(`${candidate.x},${candidate.y}`) ?? 0;
+    if (count < bestLoad) {
+      bestLoad = count;
+      seat = candidate;
+    }
   }
 
   const start = pickMateStart(rt, seat);
@@ -298,6 +314,7 @@ function spawnEndlessMate(rt: Runtime): boolean {
     stepPhase: 0,
     scareCooldown: 0,
     seatedAt: 0,
+    fade: 1,
   });
   return true;
 }

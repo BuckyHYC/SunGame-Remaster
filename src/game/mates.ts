@@ -4,7 +4,7 @@ import { PALETTE } from '../data/palette';
 import { burst } from './fx';
 import { advanceMove, movePosition, occupiedCell, startMove } from './move';
 import { say, sayLine, unlock } from './events';
-import { Runtime } from './types';
+import { MateState, Runtime } from './types';
 
 function chaserCell(rt: Runtime): Vec2 {
   const c = rt.chaser;
@@ -12,8 +12,40 @@ function chaserCell(rt: Runtime): Vec2 {
 }
 
 export function updateMates(rt: Runtime, dt: number): void {
+  let removed = false;
+
   for (const mate of rt.mates) {
     mate.scareCooldown = Math.max(0, mate.scareCooldown - dt);
+
+    // 离场：起身走向后门，到门口渐渐淡出
+    if (mate.state === 'leaving') {
+      if (mate.move) {
+        const done = advanceMove(mate.move, dt);
+        mate.pos = movePosition(mate.move, mate.cell);
+        if (done) {
+          mate.cell = { x: mate.move.to.x, y: mate.move.to.y };
+          mate.move = null;
+          mate.pos = { x: mate.cell.x, y: mate.cell.y };
+        }
+        continue;
+      }
+      if (mate.cell.x === rt.exit.x && mate.cell.y === rt.exit.y) {
+        mate.fade = Math.max(0, mate.fade - dt / 0.7);
+        if (mate.fade <= 0) removed = true;
+        continue;
+      }
+      const path = rt.grid.path(mate.cell, rt.exit);
+      const next = path && path.length > 0 ? path[0] : null;
+      if (!next) {
+        mate.fade = Math.max(0, mate.fade - dt / 0.7);
+        if (mate.fade <= 0) removed = true;
+        continue;
+      }
+      const dir = dirOf(mate.cell, next);
+      if (dir) mate.facing = dir;
+      mate.move = startMove(mate.cell, next, BALANCE.mate.stepMs);
+      continue;
+    }
 
     if (mate.move) {
       const done = advanceMove(mate.move, dt);
@@ -23,21 +55,7 @@ export function updateMates(rt: Runtime, dt: number): void {
         mate.move = null;
         mate.pos = { x: mate.cell.x, y: mate.cell.y };
         if (mate.state === 'returning' && mate.cell.x === mate.seat.x && mate.cell.y === mate.seat.y) {
-          mate.state = 'seated';
-          mate.seatedAt = rt.time;
-          mate.facing = 'down';
-          rt.seatedTotal += 1;
-          rt.pendingSfx.push('seated');
-          sayLine(rt, 'mate-seated', 1);
-          unlock(rt, 'mate-seated');
-          burst(rt, mate.cell, {
-            count: 10,
-            color: [PALETTE.hud.good, PALETTE.effect.spark],
-            speed: 34,
-            size: 1,
-            life: 0.5,
-            gravity: -12,
-          });
+          seatMate(rt, mate);
         }
       }
       continue;
@@ -59,9 +77,7 @@ export function updateMates(rt: Runtime, dt: number): void {
         if (dir) mate.facing = dir;
         mate.move = startMove(mate.cell, next, BALANCE.mate.stepMs);
       } else if (mate.cell.x === mate.seat.x && mate.cell.y === mate.seat.y) {
-        mate.state = 'seated';
-        mate.seatedAt = rt.time;
-        rt.seatedTotal += 1;
+        seatMate(rt, mate);
       }
       continue;
     }
@@ -81,6 +97,50 @@ export function updateMates(rt: Runtime, dt: number): void {
       }
     }
   }
+
+  if (removed) rt.mates = rt.mates.filter((m) => !(m.state === 'leaving' && m.fade <= 0));
+}
+
+/** 坐下：同一把椅子上如果已经有人，坐得最久的那位会起身让座 */
+function seatMate(rt: Runtime, mate: MateState): void {
+  const occupant = rt.mates.find(
+    (m) => m !== mate && m.state === 'seated' && m.seat.x === mate.seat.x && m.seat.y === mate.seat.y,
+  );
+  if (occupant) startLeaving(rt, occupant);
+
+  mate.state = 'seated';
+  mate.seatedAt = rt.time;
+  mate.fade = 1;
+  mate.pos = { x: mate.cell.x, y: mate.cell.y };
+  rt.seatedTotal += 1;
+  rt.pendingSfx.push('seated');
+  sayLine(rt, 'mate-seated', 1);
+  unlock(rt, 'mate-seated');
+  burst(rt, mate.cell, {
+    count: 10,
+    color: [PALETTE.hud.good, PALETTE.effect.spark],
+    speed: 34,
+    size: 1,
+    life: 0.5,
+    gravity: -12,
+  });
+}
+
+/** 起身离场：教室坐满后有人要让出椅子，会走到后门口再消失 */
+export function startLeaving(rt: Runtime, mate: MateState): void {
+  mate.state = 'leaving';
+  mate.move = null;
+  mate.seatedAt = 0;
+  mate.fade = 1;
+  rt.pendingSfx.push('step');
+  burst(rt, mate.cell, {
+    count: 6,
+    color: ['#fff3d6', PALETTE.effect.spark],
+    speed: 20,
+    size: 1,
+    life: 0.5,
+    gravity: -16,
+  });
 }
 
 function dirOf(from: Vec2, to: Vec2): 'up' | 'down' | 'left' | 'right' | null {
@@ -153,7 +213,7 @@ export function sendMatesHome(rt: Runtime, radius: number): number {
   const p = occupiedCell(rt.player.move, rt.player.cell);
   let count = 0;
   for (const mate of rt.mates) {
-    if (mate.state === 'seated') continue;
+    if (mate.state === 'seated' || mate.state === 'leaving') continue;
     if (chebyshev(mate.cell, p) > radius) continue;
     mate.state = 'returning';
     mate.wanderTimer = 0;

@@ -100,12 +100,17 @@ export class Renderer {
     for (const mate of rt.mates) {
       const px = mate.pos.x * TILE;
       const py = mate.pos.y * TILE;
-      const pose = mate.state === 'seated' ? 'seated' : mate.move ? 'walking' : 'scared';
+      const pose =
+        mate.state === 'seated' ? 'seated' : mate.state === 'leaving' ? 'walking' : mate.move ? 'walking' : 'scared';
       drawables.push({
         y: mate.pos.y,
         x: mate.pos.x,
         draw: () => {
           if (mate.state === 'scared') drawObjectiveRing(ctx, px, py, t + mate.id);
+          if (mate.state === 'leaving' && mate.fade < 1) {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, mate.fade);
+          }
           drawMate(ctx, {
             px,
             py,
@@ -116,6 +121,7 @@ export class Renderer {
             pose,
             shiver: t + mate.id * 0.7,
           });
+          if (mate.state === 'leaving' && mate.fade < 1) ctx.restore();
           if (mate.state === 'scared' && nearPlayer(rt, mate.pos) && rt.status === 'playing') {
             drawInteractHint(ctx, px, py, t);
           }

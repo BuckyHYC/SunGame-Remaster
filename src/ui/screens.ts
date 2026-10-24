@@ -1,5 +1,6 @@
 import { ALL_LINES, HY_LINES } from '../data/lines';
-import { LEVELS, ENDLESS_LEVEL, DUEL_LEVEL } from '../game/levels';
+import { BALANCE } from '../data/balance';
+import { LEVELS, ENDLESS_LEVEL, DUEL_LEVEL, LevelDef } from '../game/levels';
 import { Phase, ResultView, Session } from '../game/session';
 import { Rank } from '../game/scoring';
 import { SaveStore } from '../core/save';
@@ -23,7 +24,7 @@ export interface UIHandlers {
   resetSave(): void;
   click(): void;
   touchDir(dir: 'up' | 'down' | 'left' | 'right', down: boolean): void;
-  touchAction(action: 'skill' | 'interact'): void;
+  touchAction(action: 'skill' | 'interact' | 'throw'): void;
 }
 
 const RANK_LABEL: Record<Rank, string> = { S: 'S', A: 'A', B: 'B', C: 'C', D: 'D' };
@@ -86,6 +87,13 @@ export class UI {
         <div class="meter"><i class="meter__fill" data-el="warmFill"></i><i class="meter__tick"></i></div>
         <span class="hud__value" data-el="warmText">0</span>
       </div>
+      <div class="hud__group" data-el="chalkGroup" title="粉笔头：按 Q 朝面向的方向扔出去">
+        <span class="hud__label">粉笔</span>
+        <span class="hud__value" data-el="chalkText">0</span>
+      </div>
+      <div class="hud__group" data-el="keyGroup">
+        <span class="hud__tag" data-el="keyText">钥匙</span>
+      </div>
       <div class="hud__spacer"></div>
       <span class="obj" data-el="obj">—</span>
       <div class="hud__group">
@@ -110,7 +118,7 @@ export class UI {
 
   private buildFooter(): void {
     this.footer.innerHTML = `
-      <span>方向键 / WASD 移动 · <b>E</b> 喊同学回座位 · <b>空格</b> 温暖了 · <b>Shift</b> 冲刺 · <b>Esc</b> 暂停</span>
+      <span>方向键 / WASD 移动 · <b>E</b> 喊同学回座位 · <b>空格</b> 温暖了 · <b>Q</b> 扔粉笔 · <b>Shift</b> 冲刺 · <b>Esc</b> 暂停</span>
       <span>Remaster of <a href="https://github.com/BuckyHYC/SunGame" target="_blank" rel="noreferrer">孙巨的教室冒险（原版）</a></span>
     `;
   }
@@ -201,7 +209,7 @@ export class UI {
       btn.addEventListener('pointercancel', up);
       btn.addEventListener('pointerleave', up);
     }
-    for (const action of ['skill', 'interact'] as const) {
+    for (const action of ['skill', 'interact', 'throw'] as const) {
       const btn = this.touch.querySelector<HTMLElement>(`[data-touch="${action}"]`);
       if (!btn) continue;
       btn.addEventListener('pointerdown', (e) => {
@@ -268,6 +276,8 @@ export class UI {
         this.refs.warmFill.style.width = '0%';
         this.refs.timeFill.style.width = '0%';
         this.refs.skill.classList.remove('is-ready');
+        if (this.refs.chalkGroup) this.refs.chalkGroup.style.display = 'none';
+        if (this.refs.keyGroup) this.refs.keyGroup.style.display = 'none';
         this.lastHud = 'none';
       }
       return;
@@ -299,6 +309,27 @@ export class UI {
     const skillReady = hud.warmth >= 35;
     this.refs.skill.classList.toggle('is-ready', skillReady);
 
+    // 粉笔头：只有本关有粉笔头时才显示
+    if (this.refs.chalkGroup) {
+      this.refs.chalkGroup.style.display = hud.hasChalk ? 'flex' : 'none';
+      if (hud.hasChalk) {
+        this.refs.chalkText.textContent = `${hud.chalkAmmo}/${BALANCE.chalk.max}`;
+        this.refs.chalkText.classList.toggle('is-low', hud.chalkAmmo === 0);
+      }
+    }
+
+    // 钥匙：只有需要钥匙的关卡才显示
+    if (this.refs.keyGroup) {
+      const showKey = hud.keyState !== 'none';
+      this.refs.keyGroup.style.display = showKey ? 'flex' : 'none';
+      if (showKey) {
+        const held = hud.keyState === 'held';
+        this.refs.keyText.textContent = held ? '钥匙 ✓' : '钥匙 ✗';
+        this.refs.keyText.classList.toggle('is-good', held);
+        this.refs.keyText.classList.toggle('is-bad', !held);
+      }
+    }
+
     let obj: string;
     if (hud.mode === 'endless') {
       obj = `归位 ${hud.seatedTotal} 人 · ${hud.score} 分`;
@@ -308,6 +339,8 @@ export class UI {
       obj = '后门已开，快跑！';
     } else {
       obj = `喊回座位 ${hud.seated}/${hud.required}`;
+      if (hud.keyState === 'missing') obj += ' · 缺钥匙';
+      if (hud.converted > 0) obj += ` · ${hud.converted} 人入伙`;
     }
     if (this.refs.obj.textContent !== obj) this.refs.obj.textContent = obj;
     this.refs.obj.classList.toggle('is-done', hud.mode === 'campaign' && hud.exitOpen);
@@ -324,7 +357,7 @@ export class UI {
       briefing: session.currentLevel.def.hint,
       collection: 'hy 的语录都收在这里，教室里的彩蛋能翻出更多。',
       settings: '音效与动效都在这里调。',
-      help: '方向键移动，E 喊人，空格温暖了，Shift 冲刺。',
+      help: '方向键移动，E 喊人，空格温暖了，Q 扔粉笔，Shift 冲刺。',
       paused: '暂停中，按「继续」回到教室。',
       result: '这一关结束了，可以再来一次。',
     };
@@ -390,7 +423,7 @@ export class UI {
           <div class="logo__tagline">在课桌阵里躲开舞剑的同学，把走散的同学温暖回座位</div>
         </div>
         <div class="title-menu">
-          <button class="btn btn--primary" data-act="campaign">开始游戏 · 三关</button>
+          <button class="btn btn--primary" data-act="campaign">开始游戏 · ${LEVELS.length} 关</button>
           <button class="btn" data-act="duel">双人同屏 · 走廊追逐</button>
           <button class="btn" data-act="endless">无尽模式</button>
           <div class="btn-row" style="gap:8px;justify-content:center">
@@ -400,33 +433,55 @@ export class UI {
           </div>
         </div>
         <div class="title-foot">
-          ${best > 0 ? `已通关 ${best} 关 · 无尽最佳 ${bestEndless}s · ` : ''}方向键/WASD 移动 · E 喊人 · 空格 温暖了
+          ${best > 0 ? `已通关 ${best} 关 · 无尽最佳 ${bestEndless}s · ` : ''}方向键/WASD 移动 · E 喊人 · 空格 温暖了 · Q 扔粉笔
         </div>
       </div>
     `;
   }
 
   private levelScreen(): string {
-    const cards = LEVELS.map((level, index) => {
-      const best = this.save.bestFor(level.id);
-      const rank = best ? RANK_LABEL[best.rank] : null;
-      return `
+    const groups = new Map<number, { level: LevelDef; index: number }[]>();
+    LEVELS.forEach((level, index) => {
+      const chapter = level.chapter ?? 1;
+      const list = groups.get(chapter) ?? [];
+      list.push({ level, index });
+      groups.set(chapter, list);
+    });
+    const titles: Record<number, string> = {
+      1: '第一章 · 教室',
+      2: '第二章 · 走廊',
+      3: '第三章 · 月考与熄灯',
+    };
+    const blocks = [...groups.entries()]
+      .map(([chapter, items]) => {
+        const cards = items
+          .map(({ level, index }) => {
+            const best = this.save.bestFor(level.id);
+            const rank = best ? RANK_LABEL[best.rank] : null;
+            const stars = best?.stars ?? 0;
+            const starText = `${'★'.repeat(stars)}${'☆'.repeat(Math.max(0, 3 - stars))}`;
+            const scene = level.subtitle.split(' · ').pop() ?? level.subtitle;
+            return `
         <button class="level-card" data-act="level" data-id="${level.id}">
           <span class="level-card__no">${String(index + 1).padStart(2, '0')}</span>
           <span>
             <span class="level-card__name">${escapeHtml(level.name)}</span><br />
-            <span class="level-card__desc">${escapeHtml(level.subtitle)} · ${level.timeLimit} 秒</span>
+            <span class="level-card__desc">${escapeHtml(scene)} · ${level.timeLimit} 秒 · ${starText}</span>
           </span>
           <span class="level-card__rank ${rank ? '' : 'is-empty'}">${rank ?? '未通关'}</span>
         </button>
       `;
-    }).join('');
+          })
+          .join('');
+        return `<div class="chapter"><div class="chapter__title">${titles[chapter] ?? `第 ${chapter} 章`}</div><div class="level-grid">${cards}</div></div>`;
+      })
+      .join('');
     return `
-      <div class="panel">
+      <div class="panel panel--wide">
         <div class="panel__eyebrow">CAMPAIGN</div>
         <h2 class="panel__title">选择关卡</h2>
-        <p class="panel__sub">目标相同：把走散的同学喊回座位，后门才会打开。</p>
-        <div class="level-grid">${cards}</div>
+        <p class="panel__sub">目标相同：把走散的同学喊回座位，后门才会打开。每关另有三条可选挑战。</p>
+        <div class="chapters">${blocks}</div>
         <div class="panel__foot">
           <button class="btn btn--ghost" data-act="back">返回标题</button>
           <button class="btn btn--ghost" data-act="settings">设置</button>
@@ -455,6 +510,9 @@ export class UI {
               `同学 ×${level.meta.seats.length}`,
               `彩蛋 ×${level.meta.pickups.length}`,
               level.def.night ? '熄灯视野' : '教室日光',
+              ...(level.def.convertAfterScares ? ['有人会入伙'] : []),
+              ...(level.def.needKey ? ['后门要钥匙'] : []),
+              ...(level.meta.chalk.length > 0 ? [`粉笔头 ×${level.meta.chalk.length}`] : []),
             ];
     if (mode === 'campaign' && best) tagList.push(`最佳 ${best.rank} · ${best.score}`);
     const tags = tagList.map((t, i) => `<span class="tag${i === 0 ? ' tag--amber' : ''}">${escapeHtml(t)}</span>`).join('');
@@ -472,6 +530,7 @@ export class UI {
             <span><span class="kbd">E</span>喊同学回座位</span>
             <span><span class="kbd">空格</span>温暖了（35 温暖值）</span>
             <span><span class="kbd">Shift</span>冲刺</span>
+            ${level.meta.chalk.length > 0 ? '<span><span class="kbd">Q</span>扔粉笔头</span>' : ''}
             <span><span class="kbd">Esc</span>暂停</span>
           </div>
         </div>
@@ -511,12 +570,26 @@ export class UI {
       .join('');
     const extra =
       result.mode === 'campaign'
-        ? `归位 ${result.seated}/${result.required} · 彩蛋 ${result.collected} · 被命中 ${result.hits} 次`
+        ? `归位 ${result.seated}/${result.required} · 彩蛋 ${result.collected} · 被命中 ${result.hits} 次${
+            result.converted > 0 ? ` · 入伙 ${result.converted} 人` : ''
+          }${result.cured > 0 ? ` · 救回 ${result.cured} 人` : ''}`
         : result.mode === 'endless'
           ? `归位 ${result.seatedTotal} 人 · 生存 ${result.endlessSeconds?.toFixed(1) ?? '0'} 秒 · 被命中 ${result.hits} 次`
           : result.duelWinner === 'runner'
             ? `孙巨撑住了 60 秒 · 归位 ${result.seatedTotal} 人 · 剩余暖意 ${result.hpLeft}`
             : `舞剑同学赢了 · 孙巨归位 ${result.seatedTotal} 人`;
+    const starBlock =
+      result.mode === 'campaign'
+        ? `<div class="stars">${[0, 1, 2]
+            .map((i) => `<span class="star${i < result.stars ? ' is-on' : ''}">★</span>`)
+            .join('')}<span class="stars__text">${result.stars}/3</span></div>
+           <div class="star-goals">${result.starGoals
+             .map(
+               (goal) =>
+                 `<span class="star-goal${goal.met ? ' is-met' : ''}">${goal.met ? '✓' : '·'} ${escapeHtml(goal.text)}</span>`,
+             )
+             .join('')}</div>`
+        : '';
     return `
       <div class="panel panel--wide">
         <div class="panel__eyebrow">RESULT</div>
@@ -532,6 +605,7 @@ export class UI {
             }</div>
           </div>
         </div>
+        ${starBlock}
         <div class="breakdown">${breakdown}</div>
         <div class="panel__foot">
           <button class="btn btn--primary" data-act="restart">再来一次</button>
@@ -596,24 +670,26 @@ export class UI {
 
   private helpScreen(): string {
     return `
-      <div class="panel">
+      <div class="panel panel--help">
         <div class="panel__eyebrow">HOW TO PLAY</div>
         <h2 class="panel__title">操作与规则</h2>
         <p class="panel__sub">一格一格地走，别被他贴上。</p>
         <div class="panel__body">
-          <div class="keys" style="flex-direction:column;gap:8px">
+          <div class="keys" style="flex-direction:column;gap:6px">
             <span><span class="kbd">↑ ↓ ← →</span> / <span class="kbd">W A S D</span> 移动（单人模式下两套都行）</span>
             <span><span class="kbd">E</span> 靠近走散的同学，喊他回座位</span>
             <span><span class="kbd">空格</span> 温暖了！把附近同学送回座位，并把舞剑同学按回座位 2.5 秒</span>
             <span><span class="kbd">Shift</span> 冲刺三格，冷却 1.4 秒，但会暴露位置</span>
+            <span><span class="kbd">Q</span> 扔粉笔头（3 格内打断舞剑同学，也能敲醒入伙的同学）</span>
             <span><span class="kbd">Esc / P</span> 暂停，<span class="kbd">R</span> 重开</span>
           </div>
+          <div class="hint">举剑时他面前那格会亮红 —— 不能站。被砍掉一点暖意，三点掉光就出局。</div>
           <div class="hint">
-            舞剑同学举剑时，他面前那一格会亮红 —— 那一格不能站。被砍到掉一点暖意，三点掉光就出局。
+            同学被吓到第二次会「学会舞剑」：只把你推开、不掉暖意，<b>E 喊不动</b>，只有「温暖了」能劝回（救回后 6 秒免疫）。
           </div>
-          <div class="hint">
-            单人：方向键和 WASD 都归你。双人：P1 用方向键控制孙巨，P2 用 WASD 控制舞剑同学。
-          </div>
+          <div class="hint">钥匙关要先拿钥匙、再坐满；粉笔头踩到就捡，按 Q 扔出去（上限 2 个）。</div>
+          <div class="hint">每关三条可选挑战：无伤 / 特殊限制 / 限时通关，结算逐条判定并存进关卡列表。</div>
+          <div class="hint">单人两套键都归你；双人同屏 P1 方向键、P2 WASD。</div>
           <div class="goal-list">
             <span class="tag">${HY_LINES.length} 条 hy 语录</span>
             <span class="tag">原版文案全保留</span>

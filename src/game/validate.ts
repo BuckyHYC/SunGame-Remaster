@@ -26,12 +26,52 @@ export function validateLevel(def: LevelDef): LevelData {
   if (meta.seats.length === 0) issues.push('没有任何座位（字符 1-5）');
   if (meta.pickups.length === 0) issues.push('没有任何彩蛋 *');
 
+  const same = (a: Vec2, b: Vec2): boolean => a.x === b.x && a.y === b.y;
+  const onSeat = (cell: Vec2): boolean => meta.seats.some((s) => same(s, cell));
+  const onPickup = (cell: Vec2): boolean => meta.pickups.some((p) => same(p, cell));
+
   for (const seat of meta.seats) {
     if (!grid.isWalkable(seat.x, seat.y)) issues.push(`座位 (${seat.x},${seat.y}) 不可通行`);
   }
   for (const pickup of meta.pickups) {
-    if (meta.seats.some((s) => s.x === pickup.x && s.y === pickup.y)) {
+    if (onSeat(pickup)) {
       issues.push(`彩蛋 (${pickup.x},${pickup.y}) 压在座位上`);
+    }
+  }
+
+  // 粉笔头：可拾取弹药，必须可达且不和别的标记重叠
+  for (const [i, cell] of meta.chalk.entries()) {
+    if (!grid.path(meta.spawn, cell)) issues.push(`第 ${i + 1} 个粉笔头 (${cell.x},${cell.y}) 从出生点不可达`);
+    if (onSeat(cell)) issues.push(`粉笔头 (${cell.x},${cell.y}) 压在座位上`);
+    if (onPickup(cell)) issues.push(`粉笔头 (${cell.x},${cell.y}) 和彩蛋重叠`);
+  }
+
+  // 钥匙：只有 needKey 的关卡才允许出现，且必须可达
+  if (def.needKey === true) {
+    if (!meta.key) {
+      issues.push('本关需要钥匙，但地图上没有 K');
+    } else {
+      if (!grid.path(meta.spawn, meta.key)) issues.push(`钥匙 (${meta.key.x},${meta.key.y}) 从出生点不可达`);
+      if (onSeat(meta.key)) issues.push(`钥匙 (${meta.key.x},${meta.key.y}) 压在座位上`);
+      if (onPickup(meta.key)) issues.push(`钥匙 (${meta.key.x},${meta.key.y}) 和彩蛋重叠`);
+    }
+  } else if (meta.key) {
+    issues.push(`地图上放了钥匙 (${meta.key.x},${meta.key.y})，但关卡没有 needKey`);
+  }
+
+  // 三星目标：战役关必须正好 3 条；无尽/双人只是沿用模板，不参与星级结算
+  const isCampaign = LEVELS.some((level) => level.id === def.id);
+  const starGoals = def.stars ?? [];
+  if (isCampaign && starGoals.length !== 3) {
+    issues.push(`三星目标必须正好 3 条，现在是 ${starGoals.length} 条`);
+  }
+  if (isCampaign) {
+    for (const goal of starGoals) {
+      if (goal.type !== 'under-time') continue;
+      const limit = goal.value ?? 0;
+      if (limit <= 0 || limit >= def.timeLimit) {
+        issues.push(`限时目标 ${limit}s 必须大于 0 且小于关卡时限 ${def.timeLimit}s`);
+      }
     }
   }
 

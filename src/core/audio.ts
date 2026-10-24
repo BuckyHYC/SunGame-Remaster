@@ -14,6 +14,8 @@ export type Sfx =
   | 'bell'
   | 'jump'
   | 'click'
+  | 'chalk'
+  | 'shove'
   | 'suction';
 
 /**
@@ -149,6 +151,16 @@ export class AudioBus {
         break;
       case 'click':
         this.tone(660, 0.04, 'square', 0.05);
+        break;
+      case 'chalk': {
+        // 粉笔划过黑板的短促白噪
+        this.noise(0.12, 0.16, 3200, 1400);
+        this.tone(1180, 0.08, 'square', 0.04, 0, 640);
+        break;
+      }
+      case 'shove':
+        this.tone(160, 0.16, 'square', 0.1, 0, 90);
+        this.noise(0.14, 0.1, 700, 240);
         break;
       case 'suction':
         this.noise(0.4, 0.1, 200, 1600);

@@ -52,6 +52,12 @@ export const STORY_LINES: LineDef[] = [
   { id: 'lose-time', text: '时间到！游戏失败', tag: 'lose' },
   { id: 'mate-seated', text: '同学回到座位了。', tag: 'system' },
   { id: 'skill-miss', text: '温暖了……但没有人需要座位。', tag: 'system' },
+  // 以下四条是重制版新增的**系统提示**，沿用原版句式，不引入新人名/黑话
+  { id: 'mate-converted', text: '舞剑的同学教会了一位同学舞剑，他也举起了剑！', tag: 'chaser' },
+  { id: 'warm-cure', text: '被温暖到的同学放下了剑，跟着回座位了。', tag: 'warm' },
+  { id: 'key-taken', text: '拿到后门钥匙了。', tag: 'system' },
+  { id: 'key-locked', text: '座位齐了，可是没钥匙开不了后门。', tag: 'system' },
+  { id: 'chalk-picked', text: '捡到了半截粉笔头。', tag: 'system' },
 ];
 
 export const ALL_LINES: LineDef[] = [...HY_LINES, ...STORY_LINES];
@@ -71,6 +77,11 @@ export const TRIGGER_LINES: Record<string, string[]> = {
   'time-up': ['lose-time'],
   'mate-seated': ['mate-seated'],
   'skill-miss': ['skill-miss'],
+  'mate-converted': ['mate-converted'],
+  'warm-cure': ['warm-cure'],
+  'key-taken': ['key-taken'],
+  'key-locked': ['key-locked'],
+  'chalk-picked': ['chalk-picked'],
 };
 
 export function hyLineForPickup(order: number): LineDef {

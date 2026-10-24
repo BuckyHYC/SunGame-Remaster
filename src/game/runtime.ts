@@ -9,6 +9,9 @@ import { updateMates, interactMate, pickMateStart } from './mates';
 import { occupiedCell } from './move';
 import { updatePlayer } from './player';
 import { useSkill } from './skill';
+import { throwChalk } from './chalk';
+import { updateConverted } from './converted';
+import { tryOpenExit } from './exit';
 import { say, sayLine, unlock } from './events';
 import { LevelData } from './validate';
 import { FrameCommand, GameMode, Runtime } from './types';
@@ -49,6 +52,9 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       idleTime: 0,
       noise: 0,
       bumpCd: 0,
+      chalk: 0,
+      stun: 0,
+      throwFlash: 0,
       steps: 0,
     },
     chaser: {
@@ -72,6 +78,10 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     },
     mates: [],
     pickups: [],
+    chalkDrops: [],
+    keyCell: null,
+    hasKey: false,
+    keyHintShown: false,
     time: 0,
     timeLimit: endless ? Number.POSITIVE_INFINITY : def.timeLimit,
     timeLeft: endless ? Number.POSITIVE_INFINITY : def.timeLimit,
@@ -86,6 +96,9 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
     missedSkills: 0,
     collected: 0,
     skillUses: 0,
+    cured: 0,
+    convertedTotal: 0,
+    chalkThrown: 0,
     particles: [],
     shake: 0,
     flash: 0,
@@ -126,8 +139,23 @@ export function createRuntime(level: LevelData, mode: GameMode, options: Runtime
       scareCooldown: 0,
       seatedAt: 0,
       fade: 1,
+      scareCount: 0,
+      attack: null,
+      convertImmuneUntil: 0,
     });
   });
+
+  // 后门钥匙：只有 needKey 的关卡才有，其余关卡视为已经"有钥匙"
+  const needKey = def.needKey === true;
+  rt.keyCell = needKey && meta.key ? { x: meta.key.x, y: meta.key.y } : null;
+  rt.hasKey = !needKey;
+
+  // 地上的粉笔头
+  rt.chalkDrops = meta.chalk.map((cell) => ({
+    cell: { x: cell.x, y: cell.y },
+    taken: false,
+    bob: rng.range(0, Math.PI * 2),
+  }));
 
   meta.pickups.forEach((cell, index) => {
     if (duel) return;
@@ -158,20 +186,18 @@ export function stepRuntime(rt: Runtime, dt: number, cmd: FrameCommand): void {
 
   if (cmd.skill) useSkill(rt);
   if (cmd.interact) interactMate(rt);
+  if (cmd.throw) throwChalk(rt);
 
   updatePlayer(rt, step, { dir: cmd.p1, dash: cmd.dash });
   updateChaser(rt, step, cmd.p2, rt.mode === 'duel');
   updateMates(rt, step);
+  updateConverted(rt, step);
 
   const seated = rt.mates.filter((m) => m.state === 'seated').length;
   if (seated !== rt.seated) {
     rt.seated = seated;
-    // 双人模式后门一直锁着，只有战役关会开门
-    if (!rt.exitOpen && rt.mode === 'campaign' && seated >= rt.requireSeated) {
-      rt.exitOpen = true;
-      rt.pendingSfx.push('door');
-      say(rt, '同学都回座位了，后门开了！', 2);
-    }
+    // 双人模式后门一直锁着，只有战役关会开门（还要看钥匙）
+    tryOpenExit(rt);
   }
 
   checkCollision(rt);
@@ -335,6 +361,9 @@ function spawnEndlessMate(rt: Runtime): boolean {
     scareCooldown: 0,
     seatedAt: 0,
     fade: 1,
+    scareCount: 0,
+    attack: null,
+    convertImmuneUntil: 0,
   });
   return true;
 }

@@ -44,6 +44,8 @@ const CHAR_TO_TILE: Record<string, TileKind> = {
   E: 'floor',
   X: 'exit',
   '*': 'floor',
+  K: 'floor',
+  c: 'floor',
   '1': 'seat',
   '2': 'seat',
   '3': 'seat',
@@ -57,6 +59,10 @@ export interface MapMeta {
   chaser: Vec2;
   seats: Vec2[];
   pickups: Vec2[];
+  /** 后门钥匙（字符 K），没有则为 null */
+  key: Vec2 | null;
+  /** 粉笔头（字符 c），可拾取成投掷弹药 */
+  chalk: Vec2[];
   rows: string[];
 }
 
@@ -78,8 +84,10 @@ export function parseMap(rows: string[]): ParsedMap {
   let spawn: Vec2 | null = null;
   let exit: Vec2 | null = null;
   let chaser: Vec2 | null = null;
+  let key: Vec2 | null = null;
   const seats: Vec2[] = [];
   const pickups: Vec2[] = [];
+  const chalk: Vec2[] = [];
   const tiles: TileKind[][] = [];
 
   for (let y = 0; y < rows.length; y++) {
@@ -93,6 +101,11 @@ export function parseMap(rows: string[]): ParsedMap {
       if (ch === 'X') exit = { x, y };
       if (ch === 'E') chaser = { x, y };
       if (ch === '*') pickups.push({ x, y });
+      if (ch === 'c') chalk.push({ x, y });
+      if (ch === 'K') {
+        if (key) throw new Error(`地图有多个钥匙 K（${x},${y}）`);
+        key = { x, y };
+      }
       if (ch >= '1' && ch <= '5') seats.push({ x, y });
     }
     tiles.push(line);
@@ -103,7 +116,7 @@ export function parseMap(rows: string[]): ParsedMap {
   if (!chaser) throw new Error('地图缺少舞剑同学出生点 E');
 
   const grid = new Grid(tiles);
-  return { grid, meta: { spawn, exit, chaser, seats, pickups, rows: rows.slice() } };
+  return { grid, meta: { spawn, exit, chaser, seats, pickups, key, chalk, rows: rows.slice() } };
 }
 
 export class Grid {

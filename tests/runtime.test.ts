@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { createRuntime, endlessUnseatedCap, spawnPolicy, stepRuntime } from '../src/game/runtime';
 import { validateLevel } from '../src/game/validate';
 import { getLevel } from '../src/game/levels';
+import { scareAway } from '../src/game/mates';
 import { FrameCommand, Runtime } from '../src/game/types';
 import { Dir, chebyshev } from '../src/core/math';
 
-const idle: FrameCommand = { p1: null, p2: null, skill: false, interact: false, dash: false };
+const idle: FrameCommand = {
+  p1: null,
+  p2: null,
+  skill: false,
+  interact: false,
+  dash: false,
+  throw: false,
+};
 
 function makeRuntime(levelId = 'classroom-1', seed = 20250419, mode: 'campaign' | 'endless' | 'duel' = 'campaign'): Runtime {
   const data = validateLevel(getLevel(levelId));
@@ -221,6 +229,79 @@ describe('端到端：一局完整的自习课', () => {  it('依次把三位同
     stepRuntime(rt, dt, idle);
     expect(rt.status).toBe('won');
     expect(rt.pendingUnlocks.length).toBeGreaterThan(0);
+  });
+});
+
+describe('端到端：舞剑课（入伙 → 温暖了救回 → 通关）', () => {
+  it('入伙的同学要用温暖了劝回来，四位全归位后后门才开', () => {
+    const rt = makeRuntime('classroom-4', 777);
+    rt.timeLimit = 9999;
+    const dt = 1 / 60;
+
+    const driveTo = (target: { x: number; y: number }, maxFrames = 4000): boolean => {
+      for (let i = 0; i < maxFrames; i++) {
+        if (rt.player.cell.x === target.x && rt.player.cell.y === target.y && !rt.player.move) return true;
+        pinChaser(rt);
+        if (rt.player.move) {
+          stepRuntime(rt, dt, idle);
+          continue;
+        }
+        const path = rt.grid.path(rt.player.cell, target);
+        if (!path || path.length === 0) return false;
+        const next = path[0];
+        const dx = next.x - rt.player.cell.x;
+        const dy = next.y - rt.player.cell.y;
+        const dir: Dir = dx > 0 ? 'right' : dx < 0 ? 'left' : dy > 0 ? 'down' : 'up';
+        stepRuntime(rt, dt, { ...idle, p1: dir });
+      }
+      return false;
+    };
+
+    // 1) 让一位同学被吓第二次 → 入伙
+    const victim = rt.mates[0];
+    victim.scareCount = 1;
+    scareAway(rt, victim.id);
+    expect(victim.state).toBe('converted');
+    expect(rt.convertedTotal).toBe(1);
+
+    // 2) 贴上去放「温暖了」，他才会改回「回座位」
+    victim.cell = { x: 9, y: 5 };
+    victim.pos = { x: 9, y: 5 };
+    victim.move = null;
+    victim.attack = null;
+    rt.player.cell = { x: 10, y: 5 };
+    rt.player.pos = { x: 10, y: 5 };
+    rt.player.move = null;
+    stepRuntime(rt, dt, { ...idle, skill: true });
+    expect(victim.state).toBe('returning');
+    expect(rt.cured).toBe(1);
+
+    for (let i = 0; i < 3000 && victim.state !== 'seated'; i++) {
+      pinChaser(rt);
+      stepRuntime(rt, dt, idle);
+    }
+    expect(victim.state).toBe('seated');
+
+    // 3) 剩下三位照常按 E 喊回座位
+    const rest = rt.mates.filter((mate) => mate.state !== 'seated');
+    for (const mate of rest) {
+      expect(driveTo(mate.cell)).toBe(true);
+      stepRuntime(rt, dt, { ...idle, interact: true });
+      // 已经被吓到座位上的同学，按 E 会当帧坐下；其余状态先进入 returning
+      expect(mate.state).not.toBe('scared');
+      for (let i = 0; i < 2000 && mate.state !== 'seated'; i++) {
+        pinChaser(rt);
+        stepRuntime(rt, dt, idle);
+      }
+      expect(mate.state).toBe('seated');
+    }
+
+    expect(rt.seated).toBe(4);
+    expect(rt.exitOpen).toBe(true);
+
+    expect(driveTo(rt.exit)).toBe(true);
+    stepRuntime(rt, dt, idle);
+    expect(rt.status).toBe('won');
   });
 });
 

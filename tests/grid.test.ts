@@ -49,6 +49,24 @@ describe('网格解析', () => {
   it('未知字符会指出坐标', () => {
     expect(() => parseMap(['######', '#P...#', '#.?..#', '#.E..#', '######'])).toThrow(/（2,2）/);
   });
+
+  it('钥匙与粉笔头会被收集，而且都是可走地板', () => {
+    const { grid, meta } = parseMap(['######', '#PKc.#', '#....#', '#.E.X#', '######']);
+    expect(meta.key).toEqual({ x: 2, y: 1 });
+    expect(meta.chalk).toEqual([{ x: 3, y: 1 }]);
+    expect(grid.isWalkable(2, 1)).toBe(true);
+    expect(grid.isWalkable(3, 1)).toBe(true);
+  });
+
+  it('没有 K / c 时对应字段是空的', () => {
+    const { meta } = parseMap(['######', '#P...#', '#.E..#', '#...X#', '######']);
+    expect(meta.key).toBeNull();
+    expect(meta.chalk).toEqual([]);
+  });
+
+  it('一张图里出现两把钥匙会报中文错误', () => {
+    expect(() => parseMap(['######', '#PK.K#', '#.E..#', '#...X#', '######'])).toThrow(/多个钥匙/);
+  });
 });
 
 describe('寻路与视线', () => {

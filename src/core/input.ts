@@ -1,6 +1,14 @@
 import { Dir } from './math';
 
-export type Action = 'skill' | 'interact' | 'dash' | 'pause' | 'confirm' | 'cancel' | 'restart';
+export type Action =
+  | 'skill'
+  | 'interact'
+  | 'dash'
+  | 'throw'
+  | 'pause'
+  | 'confirm'
+  | 'cancel'
+  | 'restart';
 
 interface KeyMap {
   dir: Dir;
@@ -22,6 +30,7 @@ const ACTION_TABLE: Record<string, Action> = {
   ' ': 'skill',
   spacebar: 'skill',
   e: 'interact',
+  q: 'throw',
   shift: 'dash',
   escape: 'pause',
   p: 'pause',

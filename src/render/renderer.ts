@@ -5,18 +5,21 @@ import { BALANCE } from '../data/balance';
 import { LevelData } from '../game/validate';
 import { Runtime } from '../game/types';
 import { drawStaticLayer } from './tiles';
-import { drawChaser, drawMate, drawPlayer, ChaserPose } from './characters';
+import { drawChaser, drawMate, drawPlayer, ChaserPose, MatePose } from './characters';
 import {
   drawChaserTelegraph,
   drawExitState,
   drawFlash,
   drawHurtVignette,
   drawInteractHint,
+  drawKey,
   drawLowHpBorder,
   drawNight,
   drawObjectiveRing,
   drawParticles,
   drawPickup,
+  drawScareMark,
+  drawConvertedRing,
   drawSeatGlow,
   drawWarmPulse,
 } from './effects';
@@ -93,6 +96,15 @@ export class Renderer {
       drawPickup(ctx, pickup.cell.x * TILE, pickup.cell.y * TILE, pickup.kind, pickup.bob, t);
     }
 
+    // 粉笔头
+    for (const drop of rt.chalkDrops) {
+      if (drop.taken) continue;
+      drawPickup(ctx, drop.cell.x * TILE, drop.cell.y * TILE, 4, drop.bob, t);
+    }
+
+    // 后门钥匙
+    if (rt.keyCell && !rt.hasKey) drawKey(ctx, rt.keyCell.x * TILE, rt.keyCell.y * TILE, t);
+
     // 角色按 y 排序，做出前后遮挡
     type Drawable = { y: number; x: number; draw: () => void };
     const drawables: Drawable[] = [];
@@ -100,13 +112,22 @@ export class Renderer {
     for (const mate of rt.mates) {
       const px = mate.pos.x * TILE;
       const py = mate.pos.y * TILE;
-      const pose =
-        mate.state === 'seated' ? 'seated' : mate.state === 'leaving' ? 'walking' : mate.move ? 'walking' : 'scared';
+      const pose: MatePose =
+        mate.state === 'seated'
+          ? 'seated'
+          : mate.state === 'leaving'
+            ? 'walking'
+            : mate.state === 'converted'
+              ? 'converted'
+              : mate.move
+                ? 'walking'
+                : 'scared';
       drawables.push({
         y: mate.pos.y,
         x: mate.pos.x,
         draw: () => {
           if (mate.state === 'scared') drawObjectiveRing(ctx, px, py, t + mate.id);
+          if (mate.state === 'converted') drawConvertedRing(ctx, px, py, t + mate.id);
           if (mate.state === 'leaving' && mate.fade < 1) {
             ctx.save();
             ctx.globalAlpha = Math.max(0, mate.fade);
@@ -124,6 +145,40 @@ export class Renderer {
           if (mate.state === 'leaving' && mate.fade < 1) ctx.restore();
           if (mate.state === 'scared' && nearPlayer(rt, mate.pos) && rt.status === 'playing') {
             drawInteractHint(ctx, px, py, t);
+          }
+          // 已经学过一次舞剑：头顶半个剑影，提醒"再被吓一次就完了"
+          const threshold = rt.def.convertAfterScares ?? 0;
+          if (
+            threshold > 0 &&
+            mate.state !== 'converted' &&
+            mate.state !== 'seated' &&
+            mate.scareCount >= threshold - 1 &&
+            mate.scareCount > 0
+          ) {
+            drawScareMark(ctx, px, py, t);
+          }
+          // 入伙同学的挥剑预告：和舞剑同学同一套可读性
+          const atk = mate.attack;
+          if (atk) {
+            if (atk.state === 'windup') {
+              drawChaserTelegraph(
+                ctx,
+                px,
+                py,
+                mate.facing,
+                'windup',
+                1 - atk.timer / (BALANCE.converted.windupMs / 1000),
+              );
+            } else if (atk.state === 'strike') {
+              drawChaserTelegraph(
+                ctx,
+                px,
+                py,
+                mate.facing,
+                'strike',
+                1 - atk.timer / (BALANCE.converted.strikeMs / 1000),
+              );
+            }
           }
         },
       });

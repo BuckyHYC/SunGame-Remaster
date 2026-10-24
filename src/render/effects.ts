@@ -200,6 +200,48 @@ export function drawInteractHint(ctx: CanvasRenderingContext2D, px: number, py: 
   fill(ctx, '#ffd166', px + 8, y + 8, 8, 1);
 }
 
+/** 后门钥匙：金色钥匙 + 呼吸光晕 */
+export function drawKey(ctx: CanvasRenderingContext2D, px: number, py: number, t: number): void {
+  const bob = Math.round(Math.sin(t * 2.4) * 2);
+  ctx.save();
+  ctx.globalAlpha = 0.26 + Math.sin(t * 2.4) * 0.08;
+  fill(ctx, PALETTE.effect.spark, px + 7, py + 5 + bob, 10, 10);
+  ctx.restore();
+
+  const y = py + 7 + bob;
+  fill(ctx, '#ffd166', px + 8, y, 5, 5);
+  fill(ctx, '#12161d', px + 10, y + 2, 1, 1);
+  fill(ctx, '#ffd166', px + 12, y + 1, 7, 2);
+  fill(ctx, '#ffd166', px + 16, y + 3, 1, 3);
+  fill(ctx, '#ffd166', px + 18, y + 3, 1, 2);
+  fill(ctx, '#fff3d6', px + 9, y + 1, 3, 1);
+  fill(ctx, '#b8862c', px + 8, y + 4, 5, 1);
+}
+
+/** 「再被吓一次就会入伙」的提示：头顶半个剑影 */
+export function drawScareMark(ctx: CanvasRenderingContext2D, px: number, py: number, t: number): void {
+  const bounce = Math.round(Math.sin(t * 6) * 1);
+  const y = py - 7 + bounce;
+  ctx.save();
+  ctx.globalAlpha = 0.5 + Math.sin(t * 6) * 0.16;
+  fill(ctx, '#ff8a8a', px + 13, y, 1, 6);
+  fill(ctx, '#ff8a8a', px + 12, y + 5, 3, 1);
+  fill(ctx, '#ffd166', px + 11, y + 6, 5, 1);
+  ctx.restore();
+}
+
+/** 入伙同学的红色脚环：和普通同学一眼分开 */
+export function drawConvertedRing(ctx: CanvasRenderingContext2D, px: number, py: number, t: number): void {
+  ctx.save();
+  ctx.globalAlpha = 0.34 + Math.sin(t * 5) * 0.12;
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(px + TILE / 2, py + TILE - 3.5, 9, 4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawNight(
   ctx: CanvasRenderingContext2D,
   width: number,

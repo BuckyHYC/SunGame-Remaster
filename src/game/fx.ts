@@ -95,6 +95,31 @@ export function pickupSparkle(rt: Runtime, cell: Vec2): void {
   });
 }
 
+/** 粉笔头飞过的轨迹：沿路径撒白点（只加粒子，不建持久投射物） */
+export function chalkTrail(rt: Runtime, from: Vec2, to: Vec2): void {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const steps = Math.max(1, Math.max(Math.abs(dx), Math.abs(dy)));
+  const count = Math.max(2, Math.round(steps * 4 * (reducedMotion ? 0.6 : 1)));
+  const a = centerOf(from);
+  const b = centerOf(to);
+  for (let i = 0; i <= count; i++) {
+    if (rt.particles.length >= BALANCE.fx.maxParticles) break;
+    const t = i / count;
+    rt.particles.push({
+      x: a.x + (b.x - a.x) * t + rt.rng.range(-1.5, 1.5),
+      y: a.y + (b.y - a.y) * t + rt.rng.range(-1.5, 1.5),
+      vx: -dx * 8 + rt.rng.range(-10, 10),
+      vy: -dy * 8 + rt.rng.range(-10, 10),
+      life: rt.rng.range(0.14, 0.3),
+      maxLife: 0.3,
+      color: i % 5 === 0 ? '#ffffff' : '#f2f5ef',
+      size: 1,
+      gravity: 8,
+    });
+  }
+}
+
 export function addShake(rt: Runtime, amount: number): void {
   if (reducedMotion) amount *= 0.4;
   rt.shake = Math.min(7, rt.shake + amount);

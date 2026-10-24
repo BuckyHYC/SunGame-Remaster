@@ -5,8 +5,10 @@ import { BALANCE } from '../data/balance';
 import { LINE_BY_ID } from '../data/lines';
 import { createRuntime, stepRuntime } from './runtime';
 import { LevelData, validateAllLevels } from './validate';
+import { LEVELS } from './levels';
 import { FrameCommand, GameMode, Runtime } from './types';
 import { Rank, ScoreLine, scoreCampaign, scoreDuel, scoreEndless } from './scoring';
+import { evaluateStars } from './stars';
 import { setReducedMotion } from './fx';
 
 export type Phase =
@@ -42,6 +44,13 @@ export interface ResultView {
   duelWinner: 'runner' | 'chaser' | null;
   hpLeft: number;
   hasNext: boolean;
+  /** 本局达成的星数（仅战役关通关时结算） */
+  stars: number;
+  starGoals: { text: string; met: boolean }[];
+  /** 被温暖了救回来的入伙同学数 */
+  cured: number;
+  /** 本局累计入伙次数 */
+  converted: number;
 }
 
 export interface DialogEvent {
@@ -160,7 +169,7 @@ export class Session {
   }
 
   nextLevelId(): string | null {
-    const order = ['classroom-1', 'classroom-2', 'classroom-3'];
+    const order = LEVELS.map((level) => level.id);
     const idx = order.indexOf(this.selectedLevelId);
     return idx >= 0 && idx + 1 < order.length ? order[idx + 1] : null;
   }
@@ -191,6 +200,7 @@ export class Session {
       skill: actions.includes('skill'),
       interact: actions.includes('interact'),
       dash: actions.includes('dash'),
+      throw: actions.includes('throw'),
     };
 
     const stepsBefore = this.run.player.steps;
@@ -281,8 +291,19 @@ export class Session {
     }
 
     const recordable = this.selectedMode === 'campaign' && won;
+    const starResult = recordable
+      ? evaluateStars(rt, data.def)
+      : {
+          stars: 0,
+          goals: (data.def.stars ?? []).map((goal) => ({ text: goal.text, met: false })),
+        };
     const newBest = recordable
-      ? this.save.recordResult(data.def.id, { rank, score, time: Number(timeUsed.toFixed(1)) })
+      ? this.save.recordResult(data.def.id, {
+          rank,
+          score,
+          time: Number(timeUsed.toFixed(1)),
+          stars: starResult.stars,
+        })
       : false;
     this.save.countPlay(won);
 
@@ -307,6 +328,10 @@ export class Session {
       duelWinner: rt.duelWinner,
       hpLeft: rt.player.hp,
       hasNext: this.selectedMode === 'campaign' && won && this.nextLevelId() !== null,
+      stars: starResult.stars,
+      starGoals: starResult.goals,
+      cured: rt.cured,
+      converted: rt.convertedTotal,
     };
     this.phase = 'result';
   }
@@ -358,6 +383,12 @@ export class Session {
     required: number;
     exitOpen: boolean;
     mode: GameMode;
+    /** 粉笔头：本关没有粉笔头时为 false */
+    hasChalk: boolean;
+    chalkAmmo: number;
+    /** 钥匙：'none' 本关不需要，'held' 已拿到，'missing' 还没拿 */
+    keyState: 'none' | 'held' | 'missing';
+    converted: number;
   } | null {
     const rt = this.run;
     if (!rt) return null;
@@ -383,6 +414,10 @@ export class Session {
       required: Number.isFinite(rt.requireSeated) ? rt.requireSeated : 0,
       exitOpen: rt.exitOpen,
       mode: this.selectedMode,
+      hasChalk: rt.chalkDrops.length > 0,
+      chalkAmmo: rt.player.chalk,
+      keyState: rt.keyCell ? (rt.hasKey ? 'held' : 'missing') : 'none',
+      converted: rt.mates.filter((m) => m.state === 'converted').length,
     };
   }
 }

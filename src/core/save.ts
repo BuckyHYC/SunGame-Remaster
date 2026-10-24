@@ -4,6 +4,8 @@ export interface LevelRecord {
   rank: Rank;
   score: number;
   time: number;
+  /** 三星目标的最高达成数（0..3），旧档没有这个字段时按 0 处理 */
+  stars: number;
   at: number;
 }
 
@@ -70,6 +72,7 @@ export class SaveStore {
         rank: rec.rank,
         score: rec.score,
         time: Number(rec.time ?? 0),
+        stars: Math.max(0, Math.min(3, Number(rec.stars ?? 0))),
         at: Number(rec.at ?? 0),
       };
     }
@@ -102,16 +105,25 @@ export class SaveStore {
     return this.data.best[levelId] ?? null;
   }
 
-  /** 返回是否刷新了最佳成绩 */
-  recordResult(levelId: string, rec: Omit<LevelRecord, 'at'>): boolean {
+  /** 返回是否刷新了最佳成绩（星星单独取历史最大值，即使这次分数没破纪录也会留存） */
+  recordResult(
+    levelId: string,
+    rec: Omit<LevelRecord, 'at' | 'stars'> & { stars?: number },
+  ): boolean {
     const prev = this.data.best[levelId];
+    const stars = Math.max(prev?.stars ?? 0, rec.stars ?? 0);
     const isBetter =
       !prev || rec.score > prev.score || (rec.score === prev.score && rec.time < prev.time);
     if (isBetter) {
-      this.data.best[levelId] = { ...rec, at: Date.now() };
+      this.data.best[levelId] = { ...rec, stars, at: Date.now() };
+      this.write();
+      return true;
     }
-    this.write();
-    return isBetter;
+    if (prev && stars > prev.stars) {
+      this.data.best[levelId] = { ...prev, stars };
+      this.write();
+    }
+    return false;
   }
 
   countPlay(win: boolean): void {

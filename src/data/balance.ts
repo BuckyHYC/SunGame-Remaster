@@ -42,6 +42,25 @@ export const BALANCE = {
     scareDistance: 1.6,
     respawnMinDistance: 3,
   },
+  /** 入伙的同学：会挥剑，但只把你推开 —— 暖意仍然只由舞剑同学消耗 */
+  converted: {
+    stepMs: 185,
+    windupMs: 560,
+    strikeMs: 130,
+    recoverMs: 420,
+    /** 被推开后的硬直（不能起步） */
+    shoveStunMs: 350,
+    /** 超出这个距离就站在原地练剑 */
+    leash: 9,
+    /** 被「温暖了」救回来后的免疫时长 */
+    cureImmuneMs: 6000,
+  },
+  chalk: {
+    max: 2,
+    range: 3,
+    /** 打中舞剑同学造成的硬直（比「温暖了」的 2.5s 短，且不送他回座位） */
+    staggerMs: 800,
+  },
   /** 关卡时限之外的通用参数 */
   endless: {
     waveSeconds: 15,

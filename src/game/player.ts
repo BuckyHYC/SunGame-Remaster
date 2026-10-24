@@ -1,11 +1,13 @@
-import { DIR_VEC, Dir } from '../core/math';
+import { DIR_VEC, Dir, eq } from '../core/math';
 import { BALANCE } from '../data/balance';
 import { PALETTE } from '../data/palette';
 import { pickupSparkle, stepDust, burst } from './fx';
 import { advanceMove, movePosition, startMove } from './move';
-import { say } from './events';
+import { say, sayLine, unlock } from './events';
 import { Runtime } from './types';
 import { LINE_BY_ID } from '../data/lines';
+import { pickupChalk } from './chalk';
+import { tryOpenExit } from './exit';
 
 export interface PlayerCommand {
   dir: Dir | null;
@@ -19,9 +21,11 @@ export function updatePlayer(rt: Runtime, dt: number, cmd: PlayerCommand): void 
   p.dashCooldown = Math.max(0, p.dashCooldown - dt);
   p.noise = Math.max(0, p.noise - dt);
   p.bumpCd = Math.max(0, p.bumpCd - dt);
+  p.stun = Math.max(0, p.stun - dt);
+  p.throwFlash = Math.max(0, p.throwFlash - dt);
 
   // 冲刺：短促 3 格，带冷却，会把位置暴露给舞剑同学
-  if (cmd.dash && p.dashCooldown <= 0 && !p.move) {
+  if (cmd.dash && p.dashCooldown <= 0 && !p.move && p.stun <= 0) {
     p.dashLeft = BALANCE.player.dashCells;
     p.dashCooldown = BALANCE.player.dashCooldownMs / 1000;
     p.noise = Math.max(p.noise, 0.6);
@@ -56,6 +60,9 @@ export function updatePlayer(rt: Runtime, dt: number, cmd: PlayerCommand): void 
   } else {
     p.idleTime = 0;
   }
+
+  // 被入伙同学推开后短暂站不稳，不能起步
+  if (p.stun > 0) return;
 
   if (!cmd.dir) return;
 
@@ -99,5 +106,25 @@ function onArrive(rt: Runtime): void {
       if (line) say(rt, line.text, 1, line.id);
       break;
     }
+  }
+
+  // 粉笔头：变成投掷弹药
+  pickupChalk(rt, p.cell);
+
+  // 后门钥匙
+  if (!rt.hasKey && rt.keyCell && eq(p.cell, rt.keyCell)) {
+    rt.hasKey = true;
+    rt.pendingSfx.push('door');
+    sayLine(rt, 'key-taken', 2);
+    unlock(rt, 'key-taken');
+    burst(rt, p.cell, {
+      count: 14,
+      color: ['#ffd166', '#fff3d6', PALETTE.effect.spark],
+      speed: 46,
+      size: 2,
+      life: 0.55,
+      gravity: 10,
+    });
+    tryOpenExit(rt);
   }
 }

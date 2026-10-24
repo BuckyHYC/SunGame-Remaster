@@ -43,6 +43,12 @@ export interface PlayerState {
   /** 冲刺制造的噪音，追击者靠它定位 */
   noise: number;
   bumpCd: number;
+  /** 手里的粉笔头（投掷弹药），上限见 BALANCE.chalk.max */
+  chalk: number;
+  /** 被入伙同学推开后的硬直（不能起步） */
+  stun: number;
+  /** 投掷动作的表现计时 */
+  throwFlash: number;
   /** 起步次数：输入层据此消费"按键缓冲"，保证一次按键只走一格 */
   steps: number;
 }
@@ -78,7 +84,13 @@ export interface ChaserState {
   steps: number;
 }
 
-export type MateStateName = 'scared' | 'returning' | 'seated' | 'leaving';
+export type MateStateName = 'scared' | 'returning' | 'seated' | 'leaving' | 'converted';
+
+/** 入伙同学的近身挥剑节奏 */
+export interface ConvertedAttack {
+  state: 'windup' | 'strike' | 'recover';
+  timer: number;
+}
 
 export interface MateState {
   id: number;
@@ -97,6 +109,18 @@ export interface MateState {
   seatedAt: number;
   /** 离场淡出进度：1 完全不透明，0 视为已经走出去 */
   fade: number;
+  /** 被舞剑同学吓到的次数：达到关卡阈值就会入伙 */
+  scareCount: number;
+  /** 入伙后的挥剑状态；非入伙为 null */
+  attack: ConvertedAttack | null;
+  /** 被「温暖了」救回来的免疫截止时间（rt.time） */
+  convertImmuneUntil: number;
+}
+
+export interface ChalkDrop {
+  cell: Vec2;
+  taken: boolean;
+  bob: number;
 }
 
 export interface PickupState {
@@ -113,6 +137,8 @@ export interface FrameCommand {
   skill: boolean;
   interact: boolean;
   dash: boolean;
+  /** 扔粉笔头 */
+  throw: boolean;
 }
 
 export interface DialogMessage {
@@ -139,6 +165,13 @@ export interface Runtime {
   chaser: ChaserState;
   mates: MateState[];
   pickups: PickupState[];
+  /** 地上的粉笔头 */
+  chalkDrops: ChalkDrop[];
+
+  /** 后门钥匙位置（本关不需要钥匙时为 null） */
+  keyCell: Vec2 | null;
+  hasKey: boolean;
+  keyHintShown: boolean;
 
   time: number;
   timeLimit: number;
@@ -159,6 +192,12 @@ export interface Runtime {
   missedSkills: number;
   collected: number;
   skillUses: number;
+  /** 被温暖了救回来的入伙同学数 */
+  cured: number;
+  /** 累计入伙次数（三星「无人入伙」判定用） */
+  convertedTotal: number;
+  /** 累计投掷粉笔头次数（三星「不扔粉笔」判定用） */
+  chalkThrown: number;
 
   particles: Particle[];
   shake: number;

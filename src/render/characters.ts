@@ -333,7 +333,7 @@ function drawChaserSitting(ctx: CanvasRenderingContext2D, px: number, py: number
 /* 同学                                                                */
 /* ------------------------------------------------------------------ */
 
-export type MatePose = 'seated' | 'scared' | 'walking';
+export type MatePose = 'seated' | 'scared' | 'walking' | 'converted';
 
 export interface MateDrawOptions extends HumanOptions {
   variant: number;
@@ -388,6 +388,14 @@ export function drawMate(ctx: CanvasRenderingContext2D, o: MateDrawOptions): voi
       fill(ctx, '#7a4a4a', x + 11, y + 10, 2, 1);
       // 汗滴
       fill(ctx, '#9fd8ff', x + 18, y + 4, 1, 2);
+    } else if (o.pose === 'converted') {
+      // 学会舞剑：竖起来的红眼 + 一把粉笔剑
+      fill(ctx, '#c9463f', x + 9, y + 5, 2, 4);
+      fill(ctx, '#c9463f', x + 14, y + 5, 2, 4);
+      fill(ctx, '#8f2f2b', x + 11, y + 10, 3, 1);
+      fill(ctx, '#d8d3c4', x + 18, y + 15, 2, 3);
+      pixelLine(ctx, '#f2f5ef', x + 19, y + 14, 1, -2, 6, 2);
+      fill(ctx, '#ffffff', x + 20, y + 8, 1, 2);
     } else {
       fill(ctx, '#1b1b1b', x + 9, y + 6, 2, 2);
       fill(ctx, '#1b1b1b', x + 14, y + 6, 2, 2);

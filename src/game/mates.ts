@@ -4,6 +4,7 @@ import { PALETTE } from '../data/palette';
 import { burst } from './fx';
 import { advanceMove, movePosition, occupiedCell, startMove } from './move';
 import { say, sayLine, unlock } from './events';
+import { countConverted, convertMate, cureMate } from './converted';
 import { MateState, Runtime } from './types';
 
 function chaserCell(rt: Runtime): Vec2 {
@@ -16,6 +17,9 @@ export function updateMates(rt: Runtime, dt: number): void {
 
   for (const mate of rt.mates) {
     mate.scareCooldown = Math.max(0, mate.scareCooldown - dt);
+
+    // 入伙的同学由 converted.ts 单独驱动
+    if (mate.state === 'converted') continue;
 
     // 离场：起身走向后门，到门口渐渐淡出
     if (mate.state === 'leaving') {
@@ -151,10 +155,26 @@ function dirOf(from: Vec2, to: Vec2): 'up' | 'down' | 'left' | 'right' | null {
   return dy > 0 ? 'down' : 'up';
 }
 
-/** 被舞剑同学吓跑：瞬移到远处，并留下那条原版提示语 */
+/** 被舞剑同学吓跑：达到关卡阈值就当场「学会舞剑」，否则瞬移到远处并留下原版提示语 */
 export function scareAway(rt: Runtime, mateId: number): void {
   const mate = rt.mates.find((m) => m.id === mateId);
   if (!mate) return;
+  mate.scareCount += 1;
+
+  const threshold = rt.def.convertAfterScares ?? 0;
+  const cap = rt.def.convertMax ?? 2;
+  if (
+    threshold > 0 &&
+    mate.scareCount >= threshold &&
+    countConverted(rt) < cap &&
+    rt.time >= mate.convertImmuneUntil
+  ) {
+    const chaser = chaserCell(rt);
+    mate.facing = dirOf(mate.cell, chaser) ?? mate.facing;
+    convertMate(rt, mate);
+    return;
+  }
+
   const chaser = chaserCell(rt);
   const cell = rt.grid.randomWalkable(
     rt.rng,
@@ -190,7 +210,16 @@ export function interactMate(rt: Runtime): boolean {
     const dist = chebyshev(mate.cell, p);
     if (dist <= 1 && (!best || dist < best.dist)) best = { id: mate.id, dist };
   }
-  if (!best) return false;
+  if (!best) {
+    // 入伙的同学喊不动：只有「温暖了」能把他劝回来
+    const converted = rt.mates.find((m) => m.state === 'converted' && chebyshev(m.cell, p) <= 1);
+    if (converted) {
+      rt.pendingSfx.push('bump');
+      say(rt, '他学得太投入了，喊不动。', 2);
+      return true;
+    }
+    return false;
+  }
   const mate = rt.mates.find((m) => m.id === best.id);
   if (!mate) return false;
   mate.state = 'returning';
@@ -208,13 +237,18 @@ export function interactMate(rt: Runtime): boolean {
   return true;
 }
 
-/** 「温暖了」把范围内的同学一次性送回座位 */
+/** 「温暖了」把范围内的同学一次性送回座位；入伙的同学会被劝回来（治好后 6 秒免疫） */
 export function sendMatesHome(rt: Runtime, radius: number): number {
   const p = occupiedCell(rt.player.move, rt.player.cell);
   let count = 0;
   for (const mate of rt.mates) {
     if (mate.state === 'seated' || mate.state === 'leaving') continue;
     if (chebyshev(mate.cell, p) > radius) continue;
+    if (mate.state === 'converted') {
+      cureMate(rt, mate);
+      count++;
+      continue;
+    }
     mate.state = 'returning';
     mate.wanderTimer = 0;
     count++;
